@@ -9,7 +9,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.config.Customizer;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 public class SecurityConfig {
@@ -17,12 +17,24 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/users/**").permitAll()  // UWAGA: dajemy /** bo POST to też nowy podendpoint
-                        .anyRequest().authenticated()
+                // REST API -> CSRF wyłączamy
+                .csrf(AbstractHttpConfigurer::disable)
+                // (opcjonalnie) CORS jeśli front na innym porcie
+                //.cors(Customizer.withDefaults())
 
+                .authorizeHttpRequests(auth -> auth
+                        // Na czas dev możesz zostawić publiczne users, ale rozważ ograniczenie później
+                        .requestMatchers("/api/users/**").permitAll()
+
+                        // Devices: GET dla zalogowanych, POST też dla zalogowanych (możemy potem zmienić na ADMIN)
+                        .requestMatchers(HttpMethod.GET,  "/api/devices/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/devices/**").authenticated()
+
+                        // Reszta też wymaga logowania
+                        .anyRequest().authenticated()
                 )
-                .httpBasic(Customizer.withDefaults()); // <-- poprawiona składnia
+                // HTTP Basic
+                .httpBasic(basic -> {});
 
         return http.build();
     }
