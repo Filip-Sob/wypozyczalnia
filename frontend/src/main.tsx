@@ -4,26 +4,19 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import './index.css';
 
 import Layout from './layout/Layout';
+import CatalogPage from './pages/CatalogPage';
 
 const router = createBrowserRouter([
     {
         path: '/',
         element: <Layout />,
         children: [
-            {
-                index: true,
-                element: (
-                    <section className="space-y-2">
-                        <h2 className="text-2xl font-bold text-slate-900">Katalog (/)</h2>
-                        <p className="text-slate-600">Placeholder strony katalogu.</p>
-                    </section>
-                ),
-            },
+            { index: true, element: <CatalogPage /> },
             {
                 path: 'login',
                 element: (
                     <section className="space-y-2">
-                        <h2 className="text-2xl font-bold text-slate-900">Logowanie (/login)</h2>
+                        <h2 className="text-2xl font-bold text-slate-900">Logowanie</h2>
                         <p className="text-slate-600">Placeholder logowania.</p>
                     </section>
                 ),
@@ -32,7 +25,7 @@ const router = createBrowserRouter([
                 path: 'me/reservations',
                 element: (
                     <section className="space-y-2">
-                        <h2 className="text-2xl font-bold text-slate-900">Moje rezerwacje (/me/reservations)</h2>
+                        <h2 className="text-2xl font-bold text-slate-900">Moje rezerwacje</h2>
                         <p className="text-slate-600">Placeholder listy rezerwacji.</p>
                     </section>
                 ),
@@ -41,7 +34,7 @@ const router = createBrowserRouter([
                 path: 'staff',
                 element: (
                     <section className="space-y-2">
-                        <h2 className="text-2xl font-bold text-slate-900">Panel opiekuna (/staff)</h2>
+                        <h2 className="text-2xl font-bold text-slate-900">Panel opiekuna</h2>
                         <p className="text-slate-600">Placeholder panelu opiekuna.</p>
                     </section>
                 ),
