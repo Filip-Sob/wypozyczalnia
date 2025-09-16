@@ -1,71 +1,67 @@
-export default function RegisterPage() {
-    return (
-        <div className="w-full max-w-md bg-white rounded-xl shadow p-6 space-y-4">
-            <h2 className="text-center text-2xl font-bold text-slate-900">
-                Rejestracja
-            </h2>
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-            <form className="space-y-4">
+export default function RegisterPage() {
+    const navigate = useNavigate();
+    const [form, setForm] = useState({ username: "", email: "", password: "" });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.username.trim() || !form.email.trim() || !form.password.trim()) {
+            alert("Wypełnij wszystkie pola.");
+            return;
+        }
+
+        console.log("REGISTER →", form);
+
+        // przekierowanie do katalogu
+        navigate("/catalog");
+    };
+
+    return (
+        <section className="w-full max-w-md bg-white p-6 rounded-xl border">
+            <h1 className="text-2xl font-bold mb-4">Rejestracja</h1>
+            <form onSubmit={handleSubmit} className="space-y-3">
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Imię i nazwisko
-                    </label>
+                    <label className="block text-sm font-medium mb-1">Login</label>
                     <input
                         type="text"
-                        placeholder="Wpisz imię i nazwisko"
-                        className="mt-1 w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={form.username}
+                        onChange={(e) => setForm({ ...form, username: e.target.value })}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="np. jan.kowalski"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Email
-                    </label>
+                    <label className="block text-sm font-medium mb-1">E-mail</label>
                     <input
                         type="email"
-                        placeholder="Wpisz email"
-                        className="mt-1 w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="np. jan.kowalski@edu.pl"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Login
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="Wpisz login"
-                        className="mt-1 w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Hasło
-                    </label>
+                    <label className="block text-sm font-medium mb-1">Hasło</label>
                     <input
                         type="password"
-                        placeholder="Wpisz hasło"
-                        className="mt-1 w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="••••••"
                     />
                 </div>
 
                 <button
                     type="submit"
-                    className="w-full bg-black text-white py-2 rounded-md font-semibold hover:bg-slate-800"
+                    className="w-full rounded bg-black text-white px-4 py-2"
                 >
                     Zarejestruj się
                 </button>
             </form>
-
-            <p className="text-center text-sm text-slate-600">
-                Masz już konto?{" "}
-                <a href="/login" className="text-indigo-600 hover:underline">
-                    Zaloguj się
-                </a>
-            </p>
-        </div>
+        </section>
     );
 }
-
-

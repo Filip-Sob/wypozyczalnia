@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 /** ===== Mock: dane sprzętu ===== */
 type EquipmentType = "laptop" | "camera" | "projector" | "microphone" | "other";
@@ -122,7 +123,6 @@ export default function CatalogPage() {
 
     const confirmReservation = () => {
         if (!reserveItem) return;
-        // Na razie tylko mock:
         console.log("REZERWACJA →", {
             itemId: reserveItem.id,
             name: reserveItem.name,
@@ -237,8 +237,8 @@ export default function CatalogPage() {
                                         <p className="text-slate-500 text-sm">{labelType(it.type)}</p>
                                     </div>
                                     <span className={`px-2 py-1 text-xs rounded ${pillForStatus(it.status)}`}>
-                    {labelStatus(it.status)}
-                  </span>
+                                        {labelStatus(it.status)}
+                                    </span>
                                 </div>
 
                                 <ul className="text-sm text-slate-700 space-y-1">
@@ -247,7 +247,7 @@ export default function CatalogPage() {
                                     <li><span className="text-slate-500">Specyfikacja:</span> {it.specs}</li>
                                 </ul>
 
-                                <div className="pt-2">
+                                <div className="pt-2 flex gap-2">
                                     {available ? (
                                         <button
                                             onClick={() => openReserve(it)}
@@ -257,9 +257,17 @@ export default function CatalogPage() {
                                         </button>
                                     ) : (
                                         <span className="inline-block rounded bg-slate-200 text-slate-700 px-3 py-1 text-sm">
-                      Niedostępny
-                    </span>
+                                            Niedostępny
+                                        </span>
                                     )}
+
+                                    {/* 🔹 Nowy przycisk Historia */}
+                                    <Link
+                                        to={`/history/${it.id}`}
+                                        className="rounded bg-slate-700 text-white px-4 py-2 hover:bg-slate-900"
+                                    >
+                                        Historia
+                                    </Link>
                                 </div>
                             </div>
                         );
@@ -270,12 +278,7 @@ export default function CatalogPage() {
             {/* ===== Modal rezerwacji ===== */}
             {reserveItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    {/* tło */}
-                    <div
-                        className="absolute inset-0 bg-black/40"
-                        onClick={closeReserve}
-                    />
-                    {/* okno */}
+                    <div className="absolute inset-0 bg-black/40" onClick={closeReserve} />
                     <div className="relative z-10 w-full max-w-lg rounded-xl border bg-white p-5">
                         <h3 className="text-lg font-semibold mb-1">Rezerwacja</h3>
                         <p className="text-slate-600 mb-4">
@@ -304,7 +307,6 @@ export default function CatalogPage() {
                             </div>
                         </div>
 
-                        {/* komunikaty walidacji */}
                         <div className="mt-3 text-sm">
                             {dateFrom && dateTo && new Date(dateTo) < new Date(dateFrom) && (
                                 <p className="text-rose-600">Data „Do” nie może być wcześniejsza niż „Od”.</p>

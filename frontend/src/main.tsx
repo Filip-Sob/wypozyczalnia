@@ -8,7 +8,8 @@ import CatalogPage from './pages/CatalogPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MyReservationsPage from './pages/MyReservationsPage';
-import StaffPage from './pages/StaffPage'; // 👈 NOWY IMPORT
+import StaffPage from './pages/StaffPage';
+import EquipmentHistoryPage from './pages/EquipmentHistoryPage'; // 🔹 nowa strona
 
 function AuthLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -47,12 +48,11 @@ const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-            { index: true, element: <CatalogPage /> },
+            { index: true, element: <CatalogPage /> },               // /
+            { path: 'catalog', element: <CatalogPage /> },           // alias /catalog
             { path: 'me/reservations', element: <MyReservationsPage /> },
-            {
-                path: 'staff',
-                element: <StaffPage />, // 👈 TYLKO TA ZMIANA (zamiast placeholdera)
-            },
+            { path: 'staff', element: <StaffPage /> },
+            { path: 'history/:id', element: <EquipmentHistoryPage /> }, // 🔹 nowa trasa historia sprzętu
         ],
     },
     {

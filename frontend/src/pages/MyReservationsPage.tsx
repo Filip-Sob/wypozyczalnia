@@ -69,12 +69,19 @@ export default function MyReservationsPage() {
         setLoaded(true);
     }, []);
 
+    // Posortowane po dacie OD (rosnąco)
+    const sorted = useMemo(() => {
+        return [...results].sort(
+            (a, b) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime()
+        );
+    }, [results]);
+
     // Filtrowanie po statusie (status wyliczany „on the fly”)
     const visible = useMemo(() => {
         if (!loaded) return [];
-        if (filter === "all") return results;
-        return results.filter((r) => deriveStatus(r) === filter);
-    }, [filter, loaded, results]);
+        if (filter === "all") return sorted;
+        return sorted.filter((r) => deriveStatus(r) === filter);
+    }, [filter, loaded, sorted]);
 
     // Odświeżenie
     const refresh = () => {
@@ -97,11 +104,122 @@ export default function MyReservationsPage() {
         refresh();
     };
 
+    // ===== Eksport CSV =====
+    const exportCsv = () => {
+        const rows = visible.map((r) => {
+            const st = deriveStatus(r);
+            return {
+                id: r.id,
+                equipmentId: r.equipmentId,
+                equipmentName: r.equipmentName,
+                equipmentType: r.equipmentType ?? "",
+                serialNumber: r.serialNumber ?? "",
+                location: r.location ?? "",
+                dateFrom: fmt(r.dateFrom),
+                dateTo: fmt(r.dateTo),
+                status: statusLabel(st),
+                createdAt: fmt(r.createdAt),
+            };
+        });
+
+        const header = [
+            "id",
+            "equipmentId",
+            "equipmentName",
+            "equipmentType",
+            "serialNumber",
+            "location",
+            "dateFrom",
+            "dateTo",
+            "status",
+            "createdAt",
+        ];
+
+        const escape = (val: unknown) => {
+            const s = String(val ?? "");
+            const escaped = s.replace(/"/g, '""');
+            return `"${escaped}"`;
+        };
+
+        const csv =
+            header.join(",") +
+            "\n" +
+            rows.map((row) => header.map((h) => escape((row as any)[h])).join(",")).join("\n");
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "my-reservations.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // ===== Eksport PDF (jsPDF + autoTable) =====
+    const exportPdf = async () => {
+        const [{ default: jsPDF }, autoTableModule] = await Promise.all([
+            import("jspdf"),
+            import("jspdf-autotable"),
+        ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const autoTable = (autoTableModule as any).default || (autoTableModule as any);
+
+        const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+
+        const title = "My Reservations";
+        const subtitle =
+            filter === "all" ? "All statuses" : `Status: ${statusLabel(filter as ReservationStatus)}`;
+        const generated = new Date().toLocaleString();
+
+        doc.setFontSize(16);
+        doc.text(title, 40, 40);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`${subtitle} • Generated: ${generated}`, 40, 58);
+        doc.setTextColor(15);
+
+        const head = [["#", "Equipment", "Type", "Serial no.", "Location", "From", "To", "Status"]];
+
+        const body = visible.map((r, idx) => {
+            const st = deriveStatus(r);
+            return [
+                String(idx + 1),
+                r.equipmentName,
+                r.equipmentType ?? "",
+                r.serialNumber ?? "",
+                r.location ?? "",
+                fmt(r.dateFrom),
+                fmt(r.dateTo),
+                statusLabel(st),
+            ];
+        });
+
+        autoTable(doc, {
+            head,
+            body,
+            startY: 80,
+            styles: { fontSize: 9, cellPadding: 6 },
+            headStyles: { fillColor: [248, 250, 252], textColor: 15 },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            // nie używamy parametru, więc bez 'data' -> brak TS6133
+            didDrawPage: () => {
+                doc.setFontSize(9);
+                doc.setTextColor(120);
+                const footer = `© ${new Date().getFullYear()} — UniRent (frontend export)`;
+                doc.text(footer, 40, doc.internal.pageSize.getHeight() - 24);
+                doc.setTextColor(15);
+            },
+            margin: { left: 40, right: 40 },
+        });
+
+        doc.save("my-reservations.pdf");
+    };
+
     return (
         <section className="space-y-4">
             <header>
                 <h1 className="text-xl font-bold">Moje rezerwacje</h1>
-                <p className="text-slate-600">Dane z localStorage (mock, bez backendu).</p>
+                <p className="text-slate-600">Dane z localStorage (frontend-only).</p>
             </header>
 
             {/* Pasek filtra i akcji */}
@@ -122,6 +240,12 @@ export default function MyReservationsPage() {
                 </div>
 
                 <div className="ml-auto flex gap-2">
+                    <button onClick={exportPdf} className="px-4 py-2 rounded bg-indigo-700 text-white">
+                        Eksport PDF
+                    </button>
+                    <button onClick={exportCsv} className="px-4 py-2 rounded bg-slate-800 text-white">
+                        Eksport CSV
+                    </button>
                     <button onClick={refresh} className="px-4 py-2 rounded bg-black text-white">
                         Odśwież
                     </button>

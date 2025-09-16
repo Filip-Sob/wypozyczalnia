@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-// ====== Typy i mocki (Punkt 2: Zarządzanie sprzętem) ======
+// ====== Typy i mocki ======
 type EquipmentType = "laptop" | "camera" | "projector" | "microphone" | "other";
 type EquipmentStatus = "available" | "reserved" | "borrowed" | "service" | "broken";
 type EquipmentLocation = "Lab1" | "Lab2" | "warehouse";
@@ -45,7 +45,7 @@ const INITIAL_ITEMS: Equipment[] = [
     },
 ];
 
-// Pomocnicze labelki
+// ====== Pomocnicze labelki (UI) ======
 function labelType(t: EquipmentType) {
     switch (t) {
         case "laptop": return "Laptop";
@@ -55,7 +55,8 @@ function labelType(t: EquipmentType) {
         default: return "Inny";
     }
 }
-function labelStatus(s: EquipmentStatus) {
+function labelStatusUI(s: EquipmentStatus) {
+    // UI może mieć ogonki
     switch (s) {
         case "available": return "Dostępny";
         case "reserved": return "Zarezerwowany";
@@ -78,6 +79,17 @@ function statusPill(status: EquipmentStatus) {
         case "borrowed": return "bg-blue-100 text-blue-700";
         case "service": return "bg-purple-100 text-purple-700";
         case "broken": return "bg-rose-100 text-rose-700";
+    }
+}
+
+// ====== Etykiety bez ogonków (do PDF) ======
+function labelStatusAscii(s: EquipmentStatus) {
+    switch (s) {
+        case "available": return "Dostepny";
+        case "reserved":  return "Zarezerwowany";
+        case "borrowed":  return "Wypozyczony";
+        case "service":   return "Serwis";
+        case "broken":    return "Uszkodzony";
     }
 }
 
@@ -133,15 +145,12 @@ export default function StaffPage() {
     const startEdit = (it: Equipment) => {
         setEditingId(it.id);
         setEditForm({ ...it });
-        // przewiń lekko do formularza edycji (UX)
         setTimeout(() => {
             document.getElementById("edit-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
         }, 0);
     };
 
-    const cancelEdit = () => {
-        setEditingId(null);
-    };
+    const cancelEdit = () => setEditingId(null);
 
     const saveEdit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -153,24 +162,112 @@ export default function StaffPage() {
         setEditingId(null);
     };
 
+    // ===== Eksport CSV =====
+    const exportCsv = () => {
+        const header = ["name", "type", "status", "location", "serial", "specs"];
+        const rows = items.map((it) => ({
+            name: it.name,
+            type: labelType(it.type),
+            status: labelStatusAscii(it.status), // bez ogonków
+            location: labelLocation(it.location),
+            serial: it.serial,
+            specs: it.specs,
+        }));
+
+        const escape = (val: unknown) => {
+            const s = String(val ?? "");
+            const escaped = s.replace(/"/g, '""');
+            return `"${escaped}"`;
+        };
+
+        const csv =
+            header.join(",") +
+            "\n" +
+            rows.map((r) => header.map((h) => escape((r as any)[h])).join(",")).join("\n");
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "equipment-list.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // ===== Eksport PDF (jsPDF + autoTable) =====
+    const exportPdf = async () => {
+        // defensywne ładowanie modułów (działa i dla default, i dla named export)
+        const jsPDFModule = await import("jspdf");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const JsPDFCtor: any = (jsPDFModule as any).jsPDF || (jsPDFModule as any).default;
+
+        const autoTableModule = await import("jspdf-autotable");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const autoTable: any = (autoTableModule as any).default || (autoTableModule as any);
+
+        const doc = new JsPDFCtor({ orientation: "portrait", unit: "pt", format: "a4" });
+
+        doc.setFontSize(16);
+        doc.text("Equipment list", 40, 40);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 58);
+        doc.setTextColor(15);
+
+        const head = [["Name", "Type", "Status", "Location", "Serial no.", "Specs"]];
+        const body = items.map((it) => [
+            it.name,
+            labelType(it.type),
+            labelStatusAscii(it.status), // bez ogonków w PDF
+            labelLocation(it.location),
+            it.serial,
+            it.specs,
+        ]);
+
+        autoTable(doc, {
+            head,
+            body,
+            startY: 80,
+            styles: { fontSize: 9, cellPadding: 6 },
+            headStyles: { fillColor: [248, 250, 252], textColor: 15 },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            didDrawPage: () => {
+                doc.setFontSize(9);
+                doc.setTextColor(120);
+                doc.text(`© ${new Date().getFullYear()} — UniRent`, 40, doc.internal.pageSize.getHeight() - 24);
+                doc.setTextColor(15);
+            },
+            margin: { left: 40, right: 40 },
+        });
+
+        doc.save("equipment-list.pdf");
+    };
+
     return (
         <section className="space-y-6">
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold">Panel opiekuna</h1>
-                    <p className="text-slate-600">
-                        Zarządzaj sprzętem: dodawaj i modyfikuj pozycje. (Mock – backend później)
-                    </p>
+                    <p className="text-slate-600">Zarządzaj sprzętem: dodawaj, edytuj, eksportuj.</p>
                 </div>
-                <button
-                    onClick={() => setShowAddForm((s) => !s)}
-                    className="rounded bg-black text-white px-4 py-2 hover:bg-slate-800"
-                >
-                    {showAddForm ? "Ukryj formularz" : "Dodaj sprzęt"}
-                </button>
+
+                <div className="flex gap-2">
+                    <button onClick={exportPdf} className="rounded bg-indigo-700 text-white px-4 py-2">
+                        Eksport PDF
+                    </button>
+                    <button onClick={exportCsv} className="rounded bg-slate-800 text-white px-4 py-2">
+                        Eksport CSV
+                    </button>
+                    <button
+                        onClick={() => setShowAddForm((s) => !s)}
+                        className="rounded bg-black text-white px-4 py-2 hover:bg-slate-800"
+                    >
+                        {showAddForm ? "Ukryj formularz" : "Dodaj sprzęt"}
+                    </button>
+                </div>
             </header>
 
-            {/* Formularz dodawania (Punkt 2: dodawanie sprzętu) */}
+            {/* Formularz dodawania */}
             {showAddForm && (
                 <form
                     onSubmit={handleAdd}
@@ -252,24 +349,17 @@ export default function StaffPage() {
                     </div>
 
                     <div className="md:col-span-3 flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setShowAddForm(false)}
-                            className="rounded bg-black/5 text-slate-900 px-4 py-2"
-                        >
+                        <button type="button" onClick={() => setShowAddForm(false)} className="rounded bg-black/5 text-slate-900 px-4 py-2">
                             Anuluj
                         </button>
-                        <button
-                            type="submit"
-                            className="rounded bg-black text-white px-4 py-2"
-                        >
+                        <button type="submit" className="rounded bg-black text-white px-4 py-2">
                             Zapisz
                         </button>
                     </div>
                 </form>
             )}
 
-            {/* Formularz edycji (Punkt 2: edycja sprzętu) */}
+            {/* Formularz edycji */}
             {editingId !== null && (
                 <form
                     id="edit-form"
@@ -355,17 +445,10 @@ export default function StaffPage() {
                     </div>
 
                     <div className="md:col-span-3 flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="rounded bg-black/5 text-slate-900 px-4 py-2"
-                        >
+                        <button type="button" onClick={cancelEdit} className="rounded bg-black/5 text-slate-900 px-4 py-2">
                             Anuluj
                         </button>
-                        <button
-                            type="submit"
-                            className="rounded bg-black text-white px-4 py-2"
-                        >
+                        <button type="submit" className="rounded bg-black text-white px-4 py-2">
                             Zapisz zmiany
                         </button>
                     </div>
@@ -400,7 +483,7 @@ export default function StaffPage() {
                                 <td className="px-4 py-3">{labelType(it.type)}</td>
                                 <td className="px-4 py-3">
                     <span className={`px-2 py-1 text-xs rounded ${statusPill(it.status)}`}>
-                      {labelStatus(it.status)}
+                      {labelStatusUI(it.status)}
                     </span>
                                 </td>
                                 <td className="px-4 py-3">{labelLocation(it.location)}</td>
@@ -415,9 +498,7 @@ export default function StaffPage() {
                                             Edytuj
                                         </button>
                                         <button
-                                            onClick={() =>
-                                                setItems((prev) => prev.filter((x) => x.id !== it.id))
-                                            }
+                                            onClick={() => setItems((prev) => prev.filter((x) => x.id !== it.id))}
                                             className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700"
                                         >
                                             Usuń

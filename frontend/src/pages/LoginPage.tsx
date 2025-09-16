@@ -1,43 +1,56 @@
-import { Link } from 'react-router-dom';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function LoginPage() {
-    return (
-        <div className="w-full max-w-md bg-white shadow rounded-2xl p-8">
-            <h2 className="text-2xl font-bold text-center text-slate-900 mb-6">Logowanie</h2>
+    const navigate = useNavigate();
+    const [form, setForm] = useState({ username: "", password: "" });
 
-            <form className="space-y-4">
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.username.trim() || !form.password.trim()) {
+            alert("Wprowadź login i hasło.");
+            return;
+        }
+
+        console.log("LOGIN →", form);
+
+        // przekierowanie do katalogu
+        navigate("/catalog");
+    };
+
+    return (
+        <section className="w-full max-w-md bg-white p-6 rounded-xl border">
+            <h1 className="text-2xl font-bold mb-4">Logowanie</h1>
+            <form onSubmit={handleSubmit} className="space-y-3">
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">Login</label>
+                    <label className="block text-sm font-medium mb-1">Login</label>
                     <input
                         type="text"
-                        placeholder="Wpisz login"
-                        className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
+                        value={form.username}
+                        onChange={(e) => setForm({ ...form, username: e.target.value })}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="np. jan.kowalski"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-slate-700">Hasło</label>
+                    <label className="block text-sm font-medium mb-1">Hasło</label>
                     <input
                         type="password"
-                        placeholder="Wpisz hasło"
-                        className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="w-full rounded border px-3 py-2"
+                        placeholder="••••••"
                     />
                 </div>
 
                 <button
                     type="submit"
-                    className="w-full bg-black text-white font-medium py-2 px-4 rounded-md hover:bg-slate-800"
+                    className="w-full rounded bg-black text-white px-4 py-2"
                 >
                     Zaloguj się
                 </button>
             </form>
-
-            <p className="mt-4 text-center text-sm text-slate-600">
-                Nie masz konta?{' '}
-                <Link to="/register" className="text-indigo-600 hover:text-indigo-800">
-                    Zarejestruj się
-                </Link>
-            </p>
-        </div>
+        </section>
     );
 }
