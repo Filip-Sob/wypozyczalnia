@@ -1,66 +1,107 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+    getReservations,
+    cancelReservation,
+    completeReservation,
+    type Reservation,
+    type ReservationStatus,
+} from "../utils/reservationsStorage";
 
-type ReservationStatus = "upcoming" | "active" | "returned" | "canceled";
+type FilterStatus = "all" | ReservationStatus;
 
-type Reservation = {
-    id: number;
-    equipmentName: string;
-    from: string; // ISO date
-    to: string;   // ISO date
-    status: ReservationStatus;
-};
-
-const MOCK_RESERVATIONS: Reservation[] = [
-    { id: 1, equipmentName: "Laptop Dell",    from: "2025-09-20", to: "2025-09-25", status: "upcoming" },
-    { id: 2, equipmentName: "Kamera Sony",    from: "2025-09-10", to: "2025-09-15", status: "returned" },
-    { id: 3, equipmentName: "Mikrofon USB",   from: "2025-09-16", to: "2025-09-19", status: "active" },
-    { id: 4, equipmentName: "Projektor Epson",from: "2025-08-28", to: "2025-08-30", status: "canceled" },
-];
-
+// Etykiety dla statusów
 function statusLabel(s: ReservationStatus) {
     switch (s) {
-        case "upcoming": return "Zaplanowana";
-        case "active":   return "Aktywna";
-        case "returned": return "Zwrócona";
-        case "canceled": return "Anulowana";
+        case "scheduled":
+            return "Zaplanowana";
+        case "active":
+            return "Aktywna";
+        case "completed":
+            return "Zakończona";
+        case "cancelled":
+            return "Anulowana";
     }
 }
 
+// Kolory „pigułek” statusu
 function statusPillClasses(s: ReservationStatus) {
     switch (s) {
-        case "upcoming": return "bg-indigo-100 text-indigo-700";
-        case "active":   return "bg-emerald-100 text-emerald-700";
-        case "returned": return "bg-slate-100 text-slate-700";
-        case "canceled": return "bg-rose-100 text-rose-700";
+        case "scheduled":
+            return "bg-indigo-100 text-indigo-700";
+        case "active":
+            return "bg-emerald-100 text-emerald-700";
+        case "completed":
+            return "bg-slate-100 text-slate-700";
+        case "cancelled":
+            return "bg-rose-100 text-rose-700";
     }
+}
+
+// Format daty YYYY-MM-DD
+function fmt(dateISO: string) {
+    try {
+        return new Date(dateISO).toISOString().slice(0, 10);
+    } catch {
+        return dateISO;
+    }
+}
+
+// Status wyliczany z dat (do UI). Jeśli w storage jest completed/cancelled — respektujemy to.
+function deriveStatus(r: Reservation): ReservationStatus {
+    if (r.status === "cancelled" || r.status === "completed") return r.status;
+    const now = new Date();
+    const from = new Date(r.dateFrom);
+    const to = new Date(r.dateTo);
+    if (now < from) return "scheduled";
+    if (now >= from && now <= to) return "active";
+    return "completed";
 }
 
 export default function MyReservationsPage() {
-    const [pendingStatus, setPendingStatus] = useState<"all" | ReservationStatus>("all");
-    const [hasLoaded, setHasLoaded] = useState(false);
+    const [filter, setFilter] = useState<FilterStatus>("all");
     const [results, setResults] = useState<Reservation[]>([]);
+    const [loaded, setLoaded] = useState(false);
 
-    const handleFetch = () => {
-        const filtered =
-            pendingStatus === "all"
-                ? MOCK_RESERVATIONS
-                : MOCK_RESERVATIONS.filter(r => r.status === pendingStatus);
+    // Auto-wczytanie listy po wejściu
+    useEffect(() => {
+        const list = getReservations();
+        setResults(list);
+        setLoaded(true);
+    }, []);
 
-        setResults(filtered);
-        setHasLoaded(true);
+    // Filtrowanie po statusie (status wyliczany „on the fly”)
+    const visible = useMemo(() => {
+        if (!loaded) return [];
+        if (filter === "all") return results;
+        return results.filter((r) => deriveStatus(r) === filter);
+    }, [filter, loaded, results]);
+
+    // Odświeżenie
+    const refresh = () => {
+        const list = getReservations();
+        setResults(list);
+        setLoaded(true);
     };
 
     const handleClear = () => {
-        setPendingStatus("all");
-        setResults([]);
-        setHasLoaded(false);
+        setFilter("all");
+    };
+
+    const handleCancel = (id: string) => {
+        cancelReservation(id);
+        refresh();
+    };
+
+    const handleReturn = (id: string) => {
+        completeReservation(id);
+        refresh();
     };
 
     return (
         <section className="space-y-4">
             <header>
                 <h1 className="text-xl font-bold">Moje rezerwacje</h1>
-                <p className="text-slate-600">Przeglądaj i zarządzaj swoimi rezerwacjami (mock).</p>
+                <p className="text-slate-600">Dane z localStorage (mock, bez backendu).</p>
             </header>
 
             {/* Pasek filtra i akcji */}
@@ -68,62 +109,84 @@ export default function MyReservationsPage() {
                 <div>
                     <label className="block text-sm font-medium mb-1">Status</label>
                     <select
-                        value={pendingStatus}
-                        onChange={(e) => setPendingStatus(e.target.value as any)}
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value as FilterStatus)}
                         className="border rounded px-3 py-2"
                     >
                         <option value="all">Wszystkie</option>
-                        <option value="upcoming">Zaplanowane</option>
+                        <option value="scheduled">Zaplanowane</option>
                         <option value="active">Aktywne</option>
-                        <option value="returned">Zwrócone</option>
-                        <option value="canceled">Anulowane</option>
+                        <option value="completed">Zakończone</option>
+                        <option value="cancelled">Anulowane</option>
                     </select>
                 </div>
 
                 <div className="ml-auto flex gap-2">
-                    <button onClick={handleClear} className="px-4 py-2 rounded bg-black/5 text-slate-900">
-                        Wyczyść
+                    <button onClick={refresh} className="px-4 py-2 rounded bg-black text-white">
+                        Odśwież
                     </button>
-                    <button onClick={handleFetch} className="px-4 py-2 rounded bg-black text-white">
-                        Pokaż
+                    <button onClick={handleClear} className="px-4 py-2 rounded bg-black/5 text-slate-900">
+                        Wyczyść filtr
                     </button>
                 </div>
             </div>
 
             {/* Lista wyników */}
             <div className="rounded-xl border bg-white p-3">
-                {!hasLoaded ? (
-                    <p className="text-slate-600">Kliknij „Pokaż”, aby wczytać rezerwacje.</p>
-                ) : results.length === 0 ? (
+                {!loaded ? (
+                    <p className="text-slate-600">Wczytywanie…</p>
+                ) : visible.length === 0 ? (
                     <p className="text-slate-600">Brak rezerwacji dla wybranych kryteriów.</p>
                 ) : (
                     <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {results.map((r) => (
-                            <li key={r.id} className="border rounded-lg p-4">
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <h3 className="font-semibold">{r.equipmentName}</h3>
-                                        <p className="text-sm text-slate-600">
-                                            Od: {r.from} — Do: {r.to}
-                                        </p>
-                                    </div>
-                                    <span className={`text-xs px-2 py-1 rounded ${statusPillClasses(r.status)}`}>
-                    {statusLabel(r.status)}
-                  </span>
-                                </div>
+                        {visible.map((r) => {
+                            const dStatus = deriveStatus(r);
+                            const canCancel = dStatus === "scheduled" || dStatus === "active";
+                            const canReturn = dStatus === "active";
 
-                                {(r.status === "upcoming" || r.status === "active") && (
-                                    <div className="mt-3">
-                                        <button
-                                            onClick={() => alert("Mock: anulowanie rezerwacji")}
-                                            className="text-sm px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700"
-                                        >
-                                            Anuluj
-                                        </button>
+                            return (
+                                <li key={r.id} className="border rounded-lg p-4">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <h3 className="font-semibold">{r.equipmentName}</h3>
+                                            <p className="text-sm text-slate-600">
+                                                Od: {fmt(r.dateFrom)} — Do: {fmt(r.dateTo)}
+                                            </p>
+                                            {r.location && (
+                                                <p className="text-xs text-slate-500 mt-1">Lokalizacja: {r.location}</p>
+                                            )}
+                                            {r.serialNumber && (
+                                                <p className="text-xs text-slate-500">Nr seryjny: {r.serialNumber}</p>
+                                            )}
+                                        </div>
+                                        <span className={`text-xs px-2 py-1 rounded ${statusPillClasses(dStatus)}`}>
+                      {statusLabel(dStatus)}
+                    </span>
                                     </div>
-                                )}
-                            </li>
-                        ))}
+
+                                    {(canCancel || canReturn) && (
+                                        <div className="mt-3 flex gap-2">
+                                            {canCancel && (
+                                                <button
+                                                    onClick={() => handleCancel(r.id)}
+                                                    className="text-sm px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700"
+                                                >
+                                                    Anuluj
+                                                </button>
+                                            )}
+                                            {canReturn && (
+                                                <button
+                                                    onClick={() => handleReturn(r.id)}
+                                                    className="text-sm px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                                                >
+                                                    Zwróć
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </div>
