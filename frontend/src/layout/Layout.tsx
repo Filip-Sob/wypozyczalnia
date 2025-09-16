@@ -1,23 +1,31 @@
-import { Outlet } from 'react-router-dom';
-import Navbar from '../components/Navbar';
-import Sidebar from '../components/Sidebar';
+import { Outlet } from "react-router-dom";
 
 export default function Layout() {
     return (
-        <div className="min-h-dvh bg-slate-50">
-            <Navbar />
-
-            <main className="p-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-                    <Sidebar />
-                    <section className="md:col-span-9 lg:col-span-9">
-                        <Outlet />
-                    </section>
+        <div className="min-h-screen flex flex-col bg-white">
+            {/* Pasek nawigacji */}
+            <header className="border-b bg-white">
+                <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+                    <a href="/" className="text-xl font-bold text-indigo-600">
+                        Wypożyczalnia sprzętu uczelnianego
+                    </a>
+                    <nav className="space-x-6">
+                        <a href="/" className="text-slate-600 hover:text-indigo-600">Katalog</a>
+                        <a href="/me/reservations" className="text-slate-600 hover:text-indigo-600">Moje rezerwacje</a>
+                        <a href="/login" className="text-slate-600 hover:text-indigo-600">Logowanie</a>
+                        <a href="/register" className="text-slate-600 hover:text-indigo-600">Rejestracja</a>
+                    </nav>
                 </div>
+            </header>
+
+            {/* Główna treść */}
+            <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6">
+                <Outlet />
             </main>
 
+            {/* Stopka */}
             <footer className="border-t bg-white">
-                <div className="mx-auto max-w-5xl px-4 py-3 text-sm text-slate-500">
+                <div className="max-w-7xl mx-auto px-6 py-3 text-sm text-slate-500">
                     © {new Date().getFullYear()} — Projekt zespołowy
                 </div>
             </footer>

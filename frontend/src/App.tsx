@@ -1,9 +1,17 @@
-function App() {
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Layout from "./layout/Layout";
+import CatalogPage from "./pages/CatalogPage";
+import LoginPage from "./pages/LoginPage";
+
+export default function App() {
     return (
-        <h1 className="text-3xl font-bold underline text-blue-600">
-            Wypożyczalnia sprzętu uczelnianego
-        </h1>
+        <Router>
+            <Routes>
+                <Route element={<Layout />}>
+                    <Route path="/" element={<CatalogPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                </Route>
+            </Routes>
+        </Router>
     );
 }
-
-export default App;
