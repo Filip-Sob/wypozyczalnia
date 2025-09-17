@@ -12,28 +12,20 @@ type FilterStatus = "all" | ReservationStatus;
 // Etykiety dla statusów
 function statusLabel(s: ReservationStatus) {
     switch (s) {
-        case "scheduled":
-            return "Zaplanowana";
-        case "active":
-            return "Aktywna";
-        case "completed":
-            return "Zakończona";
-        case "cancelled":
-            return "Anulowana";
+        case "scheduled": return "Zaplanowana";
+        case "active": return "Aktywna";
+        case "completed": return "Zakończona";
+        case "cancelled": return "Anulowana";
     }
 }
 
 // Kolory „pigułek” statusu
 function statusPillClasses(s: ReservationStatus) {
     switch (s) {
-        case "scheduled":
-            return "bg-indigo-100 text-indigo-700";
-        case "active":
-            return "bg-emerald-100 text-emerald-700";
-        case "completed":
-            return "bg-slate-100 text-slate-700";
-        case "cancelled":
-            return "bg-rose-100 text-rose-700";
+        case "scheduled": return "bg-indigo-100 text-indigo-700";
+        case "active": return "bg-emerald-100 text-emerald-700";
+        case "completed": return "bg-slate-100 text-slate-700";
+        case "cancelled": return "bg-rose-100 text-rose-700";
     }
 }
 
@@ -46,7 +38,7 @@ function fmt(dateISO: string) {
     }
 }
 
-// Status wyliczany z dat (do UI). Jeśli w storage jest completed/cancelled — respektujemy to.
+// Status wyliczany z dat
 function deriveStatus(r: Reservation): ReservationStatus {
     if (r.status === "cancelled" || r.status === "completed") return r.status;
     const now = new Date();
@@ -62,45 +54,56 @@ export default function MyReservationsPage() {
     const [results, setResults] = useState<Reservation[]>([]);
     const [loaded, setLoaded] = useState(false);
 
-    // Auto-wczytanie listy po wejściu
+    // Modal zwrotu
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const [returningReservation, setReturningReservation] = useState<Reservation | null>(null);
+    const [returnNotes, setReturnNotes] = useState("");
+
     useEffect(() => {
-        const list = getReservations();
-        setResults(list);
-        setLoaded(true);
+        refresh();
     }, []);
 
-    // Posortowane po dacie OD (rosnąco)
+    // Posortowane po dacie OD
     const sorted = useMemo(() => {
         return [...results].sort(
             (a, b) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime()
         );
     }, [results]);
 
-    // Filtrowanie po statusie (status wyliczany „on the fly”)
+    // Filtrowanie
     const visible = useMemo(() => {
         if (!loaded) return [];
         if (filter === "all") return sorted;
         return sorted.filter((r) => deriveStatus(r) === filter);
     }, [filter, loaded, sorted]);
 
-    // Odświeżenie
+    // ✅ Odświeżenie – pełne przeładowanie listy
     const refresh = () => {
         const list = getReservations();
         setResults(list);
         setLoaded(true);
     };
 
-    const handleClear = () => {
-        setFilter("all");
-    };
+    const handleClear = () => setFilter("all");
 
     const handleCancel = (id: string) => {
         cancelReservation(id);
         refresh();
     };
 
-    const handleReturn = (id: string) => {
-        completeReservation(id);
+    const handleReturn = (res: Reservation) => {
+        setReturningReservation(res);
+        setReturnNotes("");
+        setShowReturnModal(true);
+    };
+
+    const confirmReturn = () => {
+        if (!returningReservation) return;
+        completeReservation(returningReservation.id);
+        console.log("Uwagi do zwrotu:", returnNotes);
+        setShowReturnModal(false);
+        setReturningReservation(null);
+        setReturnNotes("");
         refresh();
     };
 
@@ -123,16 +126,8 @@ export default function MyReservationsPage() {
         });
 
         const header = [
-            "id",
-            "equipmentId",
-            "equipmentName",
-            "equipmentType",
-            "serialNumber",
-            "location",
-            "dateFrom",
-            "dateTo",
-            "status",
-            "createdAt",
+            "id","equipmentId","equipmentName","equipmentType","serialNumber",
+            "location","dateFrom","dateTo","status","createdAt",
         ];
 
         const escape = (val: unknown) => {
@@ -141,9 +136,7 @@ export default function MyReservationsPage() {
             return `"${escaped}"`;
         };
 
-        const csv =
-            header.join(",") +
-            "\n" +
+        const csv = header.join(",") + "\n" +
             rows.map((row) => header.map((h) => escape((row as any)[h])).join(",")).join("\n");
 
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -155,58 +148,38 @@ export default function MyReservationsPage() {
         URL.revokeObjectURL(url);
     };
 
-    // ===== Eksport PDF (jsPDF + autoTable) =====
+    // ===== Eksport PDF =====
     const exportPdf = async () => {
         const [{ default: jsPDF }, autoTableModule] = await Promise.all([
             import("jspdf"),
             import("jspdf-autotable"),
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const autoTable = (autoTableModule as any).default || (autoTableModule as any);
-
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
 
-        const title = "My Reservations";
-        const subtitle =
-            filter === "all" ? "All statuses" : `Status: ${statusLabel(filter as ReservationStatus)}`;
-        const generated = new Date().toLocaleString();
-
         doc.setFontSize(16);
-        doc.text(title, 40, 40);
+        doc.text("My Reservations", 40, 40);
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`${subtitle} • Generated: ${generated}`, 40, 58);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 58);
         doc.setTextColor(15);
 
         const head = [["#", "Equipment", "Type", "Serial no.", "Location", "From", "To", "Status"]];
-
-        const body = visible.map((r, idx) => {
-            const st = deriveStatus(r);
-            return [
-                String(idx + 1),
-                r.equipmentName,
-                r.equipmentType ?? "",
-                r.serialNumber ?? "",
-                r.location ?? "",
-                fmt(r.dateFrom),
-                fmt(r.dateTo),
-                statusLabel(st),
-            ];
-        });
+        const body = visible.map((r, idx) => [
+            String(idx + 1), r.equipmentName, r.equipmentType ?? "",
+            r.serialNumber ?? "", r.location ?? "", fmt(r.dateFrom), fmt(r.dateTo),
+            statusLabel(deriveStatus(r)),
+        ]);
 
         autoTable(doc, {
-            head,
-            body,
-            startY: 80,
+            head, body, startY: 80,
             styles: { fontSize: 9, cellPadding: 6 },
             headStyles: { fillColor: [248, 250, 252], textColor: 15 },
             alternateRowStyles: { fillColor: [250, 250, 250] },
-            // nie używamy parametru, więc bez 'data' -> brak TS6133
             didDrawPage: () => {
                 doc.setFontSize(9);
                 doc.setTextColor(120);
-                const footer = `© ${new Date().getFullYear()} — UniRent (frontend export)`;
-                doc.text(footer, 40, doc.internal.pageSize.getHeight() - 24);
+                doc.text(`© ${new Date().getFullYear()} — UniRent`, 40, doc.internal.pageSize.getHeight() - 24);
                 doc.setTextColor(15);
             },
             margin: { left: 40, right: 40 },
@@ -284,8 +257,8 @@ export default function MyReservationsPage() {
                                             )}
                                         </div>
                                         <span className={`text-xs px-2 py-1 rounded ${statusPillClasses(dStatus)}`}>
-                      {statusLabel(dStatus)}
-                    </span>
+                                            {statusLabel(dStatus)}
+                                        </span>
                                     </div>
 
                                     {(canCancel || canReturn) && (
@@ -300,7 +273,7 @@ export default function MyReservationsPage() {
                                             )}
                                             {canReturn && (
                                                 <button
-                                                    onClick={() => handleReturn(r.id)}
+                                                    onClick={() => handleReturn(r)}
                                                     className="text-sm px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
                                                 >
                                                     Zwróć
@@ -314,6 +287,39 @@ export default function MyReservationsPage() {
                     </ul>
                 )}
             </div>
+
+            {/* Modal zwrotu */}
+            {showReturnModal && returningReservation && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowReturnModal(false)} />
+                    <div className="relative z-10 w-full max-w-lg rounded-xl border bg-white p-5">
+                        <h3 className="text-lg font-semibold mb-2">Zwrot sprzętu</h3>
+                        <p className="mb-4 text-slate-700">
+                            Sprzęt: <span className="font-medium">{returningReservation.equipmentName}</span>
+                        </p>
+                        <textarea
+                            value={returnNotes}
+                            onChange={(e) => setReturnNotes(e.target.value)}
+                            placeholder="Miejsce na twoje uwagi/usterki/uszkodzenia"
+                            className="w-full rounded border px-3 py-2 h-28 mb-4"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowReturnModal(false)}
+                                className="rounded bg-black/5 text-slate-900 px-4 py-2"
+                            >
+                                Anuluj
+                            </button>
+                            <button
+                                onClick={confirmReturn}
+                                className="rounded bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700"
+                            >
+                                Potwierdź zwrot
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </section>
     );
 }

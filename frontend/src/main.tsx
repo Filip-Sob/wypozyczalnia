@@ -9,7 +9,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MyReservationsPage from './pages/MyReservationsPage';
 import StaffPage from './pages/StaffPage';
-import EquipmentHistoryPage from './pages/EquipmentHistoryPage'; // 🔹 nowa strona
+import EquipmentHistoryPage from './pages/EquipmentHistoryPage';
 
 function AuthLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -48,11 +48,11 @@ const router = createBrowserRouter([
         path: '/',
         element: <Layout />,
         children: [
-            { index: true, element: <CatalogPage /> },               // /
-            { path: 'catalog', element: <CatalogPage /> },           // alias /catalog
+            { index: true, element: <CatalogPage /> },          // /
+            { path: 'catalog', element: <CatalogPage /> },      // alias /catalog
             { path: 'me/reservations', element: <MyReservationsPage /> },
             { path: 'staff', element: <StaffPage /> },
-            { path: 'history/:id', element: <EquipmentHistoryPage /> }, // 🔹 nowa trasa historia sprzętu
+            { path: 'equipment/:id/history', element: <EquipmentHistoryPage /> }, // historia sprzętu
         ],
     },
     {

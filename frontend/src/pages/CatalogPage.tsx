@@ -1,5 +1,8 @@
+// src/pages/CatalogPage.tsx
 import { useMemo, useState } from "react";
+import { addReservation } from "../utils/reservationsStorage";
 import { Link } from "react-router-dom";
+import { Laptop, Camera, Projector, Mic, Tablet } from "lucide-react";
 
 /** ===== Mock: dane sprzętu ===== */
 type EquipmentType = "laptop" | "camera" | "projector" | "microphone" | "other";
@@ -61,30 +64,34 @@ function pillForStatus(s: EquipmentStatus) {
     }
 }
 
+/** ===== Ikony dla typów ===== */
+function iconForType(type: EquipmentType) {
+    switch (type) {
+        case "laptop": return <Laptop className="w-5 h-5 text-slate-500" />;
+        case "camera": return <Camera className="w-5 h-5 text-slate-500" />;
+        case "projector": return <Projector className="w-5 h-5 text-slate-500" />;
+        case "microphone": return <Mic className="w-5 h-5 text-slate-500" />;
+        default: return <Tablet className="w-5 h-5 text-slate-500" />;
+    }
+}
+
 /** ===== Komponent główny: Katalog ===== */
 export default function CatalogPage() {
-    // Filtry
     const [q, setQ] = useState("");
     const [type, setType] = useState<EquipmentType | "all">("all");
     const [status, setStatus] = useState<EquipmentStatus | "any">("any");
     const [location, setLocation] = useState<EquipmentLocation | "any">("any");
-
-    // Wyniki pokazujemy DOPIERO po kliknięciu "Szukaj"
     const [allowShow, setAllowShow] = useState(false);
 
-    // Modal rezerwacji
     const [reserveItem, setReserveItem] = useState<Equipment | null>(null);
     const [dateFrom, setDateFrom] = useState<string>("");
     const [dateTo, setDateTo] = useState<string>("");
+
     const MAX_DAYS = 14;
 
     const onSearch = () => setAllowShow(true);
     const onClear = () => {
-        setQ("");
-        setType("all");
-        setStatus("any");
-        setLocation("any");
-        setAllowShow(false);
+        setQ(""); setType("all"); setStatus("any"); setLocation("any"); setAllowShow(false);
     };
 
     const results = useMemo(() => {
@@ -109,7 +116,6 @@ export default function CatalogPage() {
         setDateTo("");
     };
 
-    // prosta walidacja dat
     const daysBetween = (a: string, b: string) => {
         if (!a || !b) return 0;
         return Math.round((+new Date(b) - +new Date(a)) / (1000 * 60 * 60 * 24));
@@ -123,43 +129,36 @@ export default function CatalogPage() {
 
     const confirmReservation = () => {
         if (!reserveItem) return;
-        console.log("REZERWACJA →", {
-            itemId: reserveItem.id,
-            name: reserveItem.name,
-            from: dateFrom,
-            to: dateTo,
+        addReservation({
+            equipmentId: reserveItem.id,
+            equipmentName: reserveItem.name,
+            equipmentType: reserveItem.type,
+            serialNumber: reserveItem.serial,
+            location: reserveItem.location,
+            dateFrom,
+            dateTo,
         });
         alert(`Zarezerwowano: ${reserveItem.name}\nOd: ${dateFrom}\nDo: ${dateTo}`);
         closeReserve();
     };
 
     return (
-        <section className="space-y-4">
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Katalog sprzętu</h1>
-            <p className="text-slate-600">
-                Wyszukuj i filtruj zasoby. (Na razie mock; backend podepniemy później).
-            </p>
+        <section className="space-y-6">
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-800">Katalog sprzętu</h1>
+            <p className="text-slate-600">Wyszukuj i filtruj zasoby. (Na razie mock; backend podepniemy później).</p>
 
             {/* Pasek filtrów */}
-            <div className="rounded-xl border bg-white p-4 space-y-3">
+            <div className="rounded-xl border bg-white shadow-sm p-4 space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div>
                         <label className="block text-sm font-medium mb-1">Szukaj</label>
-                        <input
-                            className="w-full rounded border px-3 py-2"
-                            placeholder="np. Kamera Sony"
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                        />
+                        <input className="w-full rounded-lg border px-3 py-2" placeholder="np. Kamera Sony"
+                               value={q} onChange={(e) => setQ(e.target.value)} />
                     </div>
-
                     <div>
                         <label className="block text-sm font-medium mb-1">Typ</label>
-                        <select
-                            className="w-full rounded border px-3 py-2"
-                            value={type}
-                            onChange={(e) => setType(e.target.value as EquipmentType | "all")}
-                        >
+                        <select className="w-full rounded-lg border px-3 py-2"
+                                value={type} onChange={(e) => setType(e.target.value as EquipmentType | "all")}>
                             <option value="all">Wszystkie</option>
                             <option value="laptop">Laptop</option>
                             <option value="camera">Kamera</option>
@@ -168,14 +167,10 @@ export default function CatalogPage() {
                             <option value="other">Inny</option>
                         </select>
                     </div>
-
                     <div>
                         <label className="block text-sm font-medium mb-1">Status</label>
-                        <select
-                            className="w-full rounded border px-3 py-2"
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value as EquipmentStatus | "any")}
-                        >
+                        <select className="w-full rounded-lg border px-3 py-2"
+                                value={status} onChange={(e) => setStatus(e.target.value as EquipmentStatus | "any")}>
                             <option value="any">Dowolny</option>
                             <option value="available">Dostępny</option>
                             <option value="reserved">Zarezerwowany</option>
@@ -184,14 +179,10 @@ export default function CatalogPage() {
                             <option value="broken">Uszkodzony</option>
                         </select>
                     </div>
-
                     <div>
                         <label className="block text-sm font-medium mb-1">Lokalizacja</label>
-                        <select
-                            className="w-full rounded border px-3 py-2"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value as EquipmentLocation | "any")}
-                        >
+                        <select className="w-full rounded-lg border px-3 py-2"
+                                value={location} onChange={(e) => setLocation(e.target.value as EquipmentLocation | "any")}>
                             <option value="any">Dowolna</option>
                             <option value="Lab1">Laboratorium 1</option>
                             <option value="Lab2">Laboratorium 2</option>
@@ -199,18 +190,11 @@ export default function CatalogPage() {
                         </select>
                     </div>
                 </div>
-
                 <div className="flex gap-2">
-                    <button
-                        onClick={onClear}
-                        className="rounded bg-black/5 text-slate-900 px-4 py-2"
-                    >
+                    <button onClick={onClear} className="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 px-4 py-2 transition">
                         Wyczyść
                     </button>
-                    <button
-                        onClick={onSearch}
-                        className="rounded bg-black text-white px-4 py-2"
-                    >
+                    <button onClick={onSearch} className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 transition">
                         Szukaj
                     </button>
                 </div>
@@ -226,46 +210,40 @@ export default function CatalogPage() {
                     Nic nie znaleziono dla wybranych filtrów.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {results.map((it) => {
                         const available = it.status === "available";
                         return (
-                            <div key={it.id} className="rounded-xl border bg-white p-4 space-y-2">
+                            <div key={it.id} className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition space-y-2">
                                 <div className="flex items-start justify-between">
-                                    <div>
-                                        <h3 className="font-semibold">{it.name}</h3>
-                                        <p className="text-slate-500 text-sm">{labelType(it.type)}</p>
+                                    <div className="flex items-center gap-2">
+                                        {iconForType(it.type)}
+                                        <div>
+                                            <h3 className="font-semibold text-slate-800">{it.name}</h3>
+                                            <p className="text-slate-500 text-sm">{labelType(it.type)}</p>
+                                        </div>
                                     </div>
-                                    <span className={`px-2 py-1 text-xs rounded ${pillForStatus(it.status)}`}>
-                                        {labelStatus(it.status)}
-                                    </span>
+                                    <span className={`px-2 py-1 text-xs rounded-lg font-medium ${pillForStatus(it.status)}`}>
+                    {labelStatus(it.status)}
+                  </span>
                                 </div>
-
                                 <ul className="text-sm text-slate-700 space-y-1">
                                     <li><span className="text-slate-500">Lokalizacja:</span> {labelLocation(it.location)}</li>
                                     <li><span className="text-slate-500">Nr seryjny:</span> {it.serial}</li>
                                     <li><span className="text-slate-500">Specyfikacja:</span> {it.specs}</li>
                                 </ul>
-
                                 <div className="pt-2 flex gap-2">
                                     {available ? (
-                                        <button
-                                            onClick={() => openReserve(it)}
-                                            className="rounded bg-black text-white px-4 py-2"
-                                        >
+                                        <button onClick={() => openReserve(it)} className="flex-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm transition">
                                             Zarezerwuj
                                         </button>
                                     ) : (
-                                        <span className="inline-block rounded bg-slate-200 text-slate-700 px-3 py-1 text-sm">
-                                            Niedostępny
-                                        </span>
+                                        <span className="flex-1 inline-block text-center rounded-lg bg-slate-200 text-slate-700 px-3 py-2 text-sm">
+                      Niedostępny
+                    </span>
                                     )}
-
-                                    {/* 🔹 Nowy przycisk Historia */}
-                                    <Link
-                                        to={`/history/${it.id}`}
-                                        className="rounded bg-slate-700 text-white px-4 py-2 hover:bg-slate-900"
-                                    >
+                                    <Link to={`/equipment/${it.id}/history`}
+                                          className="flex-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 text-sm text-center transition">
                                         Historia
                                     </Link>
                                 </div>
@@ -279,57 +257,37 @@ export default function CatalogPage() {
             {reserveItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/40" onClick={closeReserve} />
-                    <div className="relative z-10 w-full max-w-lg rounded-xl border bg-white p-5">
+                    <div className="relative z-10 w-full max-w-lg rounded-xl border bg-white p-6 shadow-lg">
                         <h3 className="text-lg font-semibold mb-1">Rezerwacja</h3>
                         <p className="text-slate-600 mb-4">
                             Sprzęt: <span className="font-medium">{reserveItem.name}</span>
                         </p>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-sm font-medium mb-1">Od</label>
-                                <input
-                                    type="date"
-                                    className="w-full rounded border px-3 py-2"
-                                    value={dateFrom}
-                                    onChange={(e) => setDateFrom(e.target.value)}
-                                />
+                                <input type="date" className="w-full rounded-lg border px-3 py-2"
+                                       value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1">Do</label>
-                                <input
-                                    type="date"
-                                    className="w-full rounded border px-3 py-2"
-                                    value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
-                                    min={dateFrom || undefined}
-                                />
+                                <input type="date" className="w-full rounded-lg border px-3 py-2"
+                                       value={dateTo} onChange={(e) => setDateTo(e.target.value)} min={dateFrom || undefined} />
                             </div>
                         </div>
-
                         <div className="mt-3 text-sm">
                             {dateFrom && dateTo && new Date(dateTo) < new Date(dateFrom) && (
                                 <p className="text-rose-600">Data „Do” nie może być wcześniejsza niż „Od”.</p>
                             )}
                             {dateFrom && dateTo && daysBetween(dateFrom, dateTo) > MAX_DAYS && (
-                                <p className="text-rose-600">
-                                    Maksymalny czas wypożyczenia to {MAX_DAYS} dni.
-                                </p>
+                                <p className="text-rose-600">Maksymalny czas wypożyczenia to {MAX_DAYS} dni.</p>
                             )}
                         </div>
-
                         <div className="mt-5 flex justify-end gap-2">
-                            <button
-                                onClick={closeReserve}
-                                className="rounded bg-black/5 text-slate-900 px-4 py-2"
-                            >
+                            <button onClick={closeReserve} className="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 px-4 py-2 transition">
                                 Anuluj
                             </button>
-                            <button
-                                disabled={!canConfirm}
-                                onClick={confirmReservation}
-                                className={`rounded px-4 py-2 text-white ${canConfirm ? "bg-black" : "bg-slate-400 cursor-not-allowed"}`}
-                            >
+                            <button disabled={!canConfirm} onClick={confirmReservation}
+                                    className={`rounded-lg px-4 py-2 text-white transition ${canConfirm ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-400 cursor-not-allowed"}`}>
                                 Potwierdź
                             </button>
                         </div>
