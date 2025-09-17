@@ -3,31 +3,33 @@ package pl.sobczak.wypozyczalnia.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-public enum LoanStatus {
-    ACTIVE("AKTYWNE"),
-    RETURNED("ZWRÓCONE"),
-    OVERDUE("PRZETERMINOWANE"),
-    CANCELED("ANULOWANE");
+public enum DeviceStatus {
+    AVAILABLE("DOSTĘPNY"),
+    RESERVED("ZAREZERWOWANY"),
+    LOANED("WYPOŻYCZONY"),
+    MAINTENANCE("SERWIS"),
+    LOST("ZGUBIONY"),
+    DAMAGED("USZKODZONY");
 
     private final String pl;
 
-    LoanStatus(String pl) { this.pl = pl; }
+    DeviceStatus(String pl) { this.pl = pl; }
 
-    /** to, co wyświetlamy w JSON (po polsku) */
+    /** Co pokażemy w JSON (PL) */
     @JsonValue
     public String toJson() { return pl; }
 
-    /** akceptujemy w żądaniach JSON zarówno PL jak i EN */
+    /** Przyjmuj w JSON zarówno PL jak i EN */
     @JsonCreator
-    public static LoanStatus fromJson(String value) {
+    public static DeviceStatus fromJson(String value) {
         if (value == null) return null;
         String v = value.trim();
-        for (LoanStatus s : values()) {
+        for (DeviceStatus s : values()) {
             if (s.pl.equalsIgnoreCase(v) || s.name().equalsIgnoreCase(v)) {
                 return s;
             }
         }
-        throw new IllegalArgumentException("Nieznany status wypożyczenia: " + value);
+        throw new IllegalArgumentException("Nieznany status: " + value);
     }
 
     public String getPl() { return pl; }

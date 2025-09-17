@@ -21,9 +21,9 @@ public class Loan {
     private LocalDate returnDate;
 
     @Enumerated(EnumType.STRING)
-    private LoanStatus status = LoanStatus.ACTIVE;
+    private LoanStatus status = LoanStatus.ACTIVE;   // 👈 to jest potrzebne pole
 
-    // --- gettery i settery ---
+    // gettery i settery
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

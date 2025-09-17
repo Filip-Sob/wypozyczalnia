@@ -1,6 +1,7 @@
 package pl.sobczak.wypozyczalnia.config;
 
 import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.WebRequest;
@@ -18,13 +19,23 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.toMap(
                         f -> f.getField(),
                         f -> f.getDefaultMessage(),
-                        (a,b)->a
+                        (a, b) -> a
                 ));
         return ResponseEntity.badRequest().body(Map.of(
                 "czas", Instant.now(),
                 "sciezka", req.getDescription(false),
                 "komunikat", "Walidacja nie powiodła się",
                 "bledy", errors
+        ));
+    }
+
+    // ⬇️ NOWE: czytelny 400 dla pustego/zepsutego JSON
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleUnreadable(HttpMessageNotReadableException ex, WebRequest req) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "czas", Instant.now(),
+                "sciezka", req.getDescription(false),
+                "komunikat", "Nieprawidłowe lub puste body JSON"
         ));
     }
 

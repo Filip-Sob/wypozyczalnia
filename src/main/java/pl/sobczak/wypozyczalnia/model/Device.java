@@ -13,9 +13,11 @@ public class Device {
     private String type;
     private String serialNumber;
     private String location;
-    private String status;
 
-    // Gettery i settery
+    @Enumerated(EnumType.STRING)
+    private DeviceStatus status = DeviceStatus.AVAILABLE; // domyślnie dostępny
+
+    // --- Gettery i settery ---
     public Long getId() {
         return id;
     }
@@ -56,11 +58,11 @@ public class Device {
         this.location = location;
     }
 
-    public String getStatus() {
+    public DeviceStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(DeviceStatus status) {
         this.status = status;
     }
 }
