@@ -56,7 +56,6 @@ function labelType(t: EquipmentType) {
     }
 }
 function labelStatusUI(s: EquipmentStatus) {
-    // UI może mieć ogonki
     switch (s) {
         case "available": return "Dostępny";
         case "reserved": return "Zarezerwowany";
@@ -82,19 +81,18 @@ function statusPill(status: EquipmentStatus) {
     }
 }
 
-// ====== Etykiety bez ogonków (do PDF) ======
+// ====== Etykiety bez ogonków (do PDF/CSV) ======
 function labelStatusAscii(s: EquipmentStatus) {
     switch (s) {
         case "available": return "Dostepny";
-        case "reserved":  return "Zarezerwowany";
-        case "borrowed":  return "Wypozyczony";
-        case "service":   return "Serwis";
-        case "broken":    return "Uszkodzony";
+        case "reserved": return "Zarezerwowany";
+        case "borrowed": return "Wypozyczony";
+        case "service": return "Serwis";
+        case "broken": return "Uszkodzony";
     }
 }
 
 export default function StaffPage() {
-    // Lista sprzętu (mock) — później fetch z backendu
     const [items, setItems] = useState<Equipment[]>(INITIAL_ITEMS);
 
     // ===== Dodawanie =====
@@ -117,7 +115,6 @@ export default function StaffPage() {
         }
         const newItem: Equipment = { ...form, id: Date.now() };
         setItems((prev) => [newItem, ...prev]);
-        // reset
         setForm({
             id: 0,
             name: "",
@@ -145,9 +142,6 @@ export default function StaffPage() {
     const startEdit = (it: Equipment) => {
         setEditingId(it.id);
         setEditForm({ ...it });
-        setTimeout(() => {
-            document.getElementById("edit-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 0);
     };
 
     const cancelEdit = () => setEditingId(null);
@@ -168,7 +162,7 @@ export default function StaffPage() {
         const rows = items.map((it) => ({
             name: it.name,
             type: labelType(it.type),
-            status: labelStatusAscii(it.status), // bez ogonków
+            status: labelStatusAscii(it.status),
             location: labelLocation(it.location),
             serial: it.serial,
             specs: it.specs,
@@ -194,15 +188,11 @@ export default function StaffPage() {
         URL.revokeObjectURL(url);
     };
 
-    // ===== Eksport PDF (jsPDF + autoTable) =====
+    // ===== Eksport PDF =====
     const exportPdf = async () => {
-        // defensywne ładowanie modułów (działa i dla default, i dla named export)
         const jsPDFModule = await import("jspdf");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const JsPDFCtor: any = (jsPDFModule as any).jsPDF || (jsPDFModule as any).default;
-
         const autoTableModule = await import("jspdf-autotable");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const autoTable: any = (autoTableModule as any).default || (autoTableModule as any);
 
         const doc = new JsPDFCtor({ orientation: "portrait", unit: "pt", format: "a4" });
@@ -210,15 +200,13 @@ export default function StaffPage() {
         doc.setFontSize(16);
         doc.text("Equipment list", 40, 40);
         doc.setFontSize(10);
-        doc.setTextColor(100);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 58);
-        doc.setTextColor(15);
 
         const head = [["Name", "Type", "Status", "Location", "Serial no.", "Specs"]];
         const body = items.map((it) => [
             it.name,
             labelType(it.type),
-            labelStatusAscii(it.status), // bez ogonków w PDF
+            labelStatusAscii(it.status),
             labelLocation(it.location),
             it.serial,
             it.specs,
@@ -229,15 +217,6 @@ export default function StaffPage() {
             body,
             startY: 80,
             styles: { fontSize: 9, cellPadding: 6 },
-            headStyles: { fillColor: [248, 250, 252], textColor: 15 },
-            alternateRowStyles: { fillColor: [250, 250, 250] },
-            didDrawPage: () => {
-                doc.setFontSize(9);
-                doc.setTextColor(120);
-                doc.text(`© ${new Date().getFullYear()} — UniRent`, 40, doc.internal.pageSize.getHeight() - 24);
-                doc.setTextColor(15);
-            },
-            margin: { left: 40, right: 40 },
         });
 
         doc.save("equipment-list.pdf");
@@ -246,21 +225,23 @@ export default function StaffPage() {
     return (
         <section className="space-y-6">
             <header className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl font-bold">Panel opiekuna</h1>
-                    <p className="text-slate-600">Zarządzaj sprzętem: dodawaj, edytuj, eksportuj.</p>
-                </div>
-
+                <h1 className="text-xl font-bold">Panel opiekuna</h1>
                 <div className="flex gap-2">
-                    <button onClick={exportPdf} className="rounded bg-indigo-700 text-white px-4 py-2">
+                    <button
+                        onClick={exportPdf}
+                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                    >
                         Eksport PDF
                     </button>
-                    <button onClick={exportCsv} className="rounded bg-slate-800 text-white px-4 py-2">
+                    <button
+                        onClick={exportCsv}
+                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                    >
                         Eksport CSV
                     </button>
                     <button
                         onClick={() => setShowAddForm((s) => !s)}
-                        className="rounded bg-black text-white px-4 py-2 hover:bg-slate-800"
+                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
                     >
                         {showAddForm ? "Ukryj formularz" : "Dodaj sprzęt"}
                     </button>
@@ -349,10 +330,10 @@ export default function StaffPage() {
                     </div>
 
                     <div className="md:col-span-3 flex justify-end gap-2">
-                        <button type="button" onClick={() => setShowAddForm(false)} className="rounded bg-black/5 text-slate-900 px-4 py-2">
+                        <button type="button" onClick={() => setShowAddForm(false)} className="rounded bg-gray-200 text-gray-900 px-4 py-2 hover:bg-gray-300 cursor-pointer">
                             Anuluj
                         </button>
-                        <button type="submit" className="rounded bg-black text-white px-4 py-2">
+                        <button type="submit" className="rounded bg-black text-white px-4 py-2 hover:bg-gray-800 cursor-pointer">
                             Zapisz
                         </button>
                     </div>
@@ -445,10 +426,10 @@ export default function StaffPage() {
                     </div>
 
                     <div className="md:col-span-3 flex justify-end gap-2">
-                        <button type="button" onClick={cancelEdit} className="rounded bg-black/5 text-slate-900 px-4 py-2">
+                        <button type="button" onClick={cancelEdit} className="rounded bg-gray-200 text-gray-900 px-4 py-2 hover:bg-gray-300 cursor-pointer">
                             Anuluj
                         </button>
-                        <button type="submit" className="rounded bg-black text-white px-4 py-2">
+                        <button type="submit" className="rounded bg-black text-white px-4 py-2 hover:bg-gray-800 cursor-pointer">
                             Zapisz zmiany
                         </button>
                     </div>
@@ -482,9 +463,9 @@ export default function StaffPage() {
                                 <td className="px-4 py-3">{it.name}</td>
                                 <td className="px-4 py-3">{labelType(it.type)}</td>
                                 <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded ${statusPill(it.status)}`}>
-                      {labelStatusUI(it.status)}
-                    </span>
+                                        <span className={`px-2 py-1 text-xs rounded ${statusPill(it.status)}`}>
+                                            {labelStatusUI(it.status)}
+                                        </span>
                                 </td>
                                 <td className="px-4 py-3">{labelLocation(it.location)}</td>
                                 <td className="px-4 py-3">{it.serial}</td>
@@ -493,13 +474,13 @@ export default function StaffPage() {
                                     <div className="flex justify-end gap-2">
                                         <button
                                             onClick={() => startEdit(it)}
-                                            className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                                            className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer"
                                         >
                                             Edytuj
                                         </button>
                                         <button
                                             onClick={() => setItems((prev) => prev.filter((x) => x.id !== it.id))}
-                                            className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700"
+                                            className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
                                         >
                                             Usuń
                                         </button>

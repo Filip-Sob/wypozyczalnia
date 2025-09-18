@@ -1,56 +1,138 @@
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
+import { useState } from "react";
 
 export default function Navbar() {
+    const [open, setOpen] = useState(false);
+
     const linkBase =
-        "px-3 py-1 rounded-md text-sm transition-colors";
+        "relative px-3 py-2 rounded-md text-sm font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-white/70";
     const linkInactive =
-        "text-slate-700 hover:text-slate-900 hover:bg-slate-100";
+        "text-white/80 hover:text-white hover:bg-white/10 border-b-2 border-transparent hover:border-white/50";
     const linkActive =
-        "bg-indigo-50 text-indigo-700";
+        "text-white bg-white/10 border-b-2 border-white";
 
     return (
-        <header className="sticky top-0 z-40 border-b bg-white">
-            <div className="mx-auto max-w-6xl h-14 px-4 flex items-center justify-between">
-                {/* Brand w jednym kolorze */}
-                <Link to="/" className="text-indigo-700 font-semibold tracking-tight">
-                    Wypożyczalnia sprzętu uczelnianego
-                </Link>
+        <header className="sticky top-0 z-50 bg-gradient-to-r from-indigo-700 via-blue-800 to-slate-900 shadow">
 
-                <nav className="flex items-center gap-2">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6">
+                <div className="h-14 flex items-center justify-between">
+                    {/* Brand */}
                     <NavLink
-                        to="/"
-                        end
-                        className={({ isActive }) =>
-                            `${linkBase} ${isActive ? linkActive : linkInactive}`
-                        }
+                        to="/catalog"
+                        className="text-white font-semibold tracking-tight text-base sm:text-lg"
                     >
-                        Katalog
+                        Wypożyczalnia sprzętu uczelnianego
                     </NavLink>
-                    <NavLink
-                        to="/login"
-                        className={({ isActive }) =>
-                            `${linkBase} ${isActive ? linkActive : linkInactive}`
-                        }
+
+                    {/* Desktop nav */}
+                    <nav className="hidden md:flex items-center gap-1">
+                        <NavLink
+                            to="/catalog"
+                            end
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                        >
+                            Katalog
+                        </NavLink>
+                        <NavLink
+                            to="/me/reservations"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                        >
+                            Moje rezerwacje
+                        </NavLink>
+                        <NavLink
+                            to="/login"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                        >
+                            Logowanie
+                        </NavLink>
+                        <NavLink
+                            to="/register"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                        >
+                            Rejestracja
+                        </NavLink>
+                        <NavLink
+                            to="/staff"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                        >
+                            Panel opiekuna
+                        </NavLink>
+                    </nav>
+
+                    {/* Mobile toggle */}
+                    <button
+                        aria-label="Otwórz menu"
+                        className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-white/90 hover:text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
+                        onClick={() => setOpen((v) => !v)}
                     >
-                        Logowanie
-                    </NavLink>
-                    <NavLink
-                        to="/me/reservations"
-                        className={({ isActive }) =>
-                            `${linkBase} ${isActive ? linkActive : linkInactive}`
-                        }
-                    >
-                        Moje rezerwacje
-                    </NavLink>
-                    <NavLink
-                        to="/staff"
-                        className={({ isActive }) =>
-                            `${linkBase} ${isActive ? linkActive : linkInactive}`
-                        }
-                    >
-                        Panel opiekuna
-                    </NavLink>
-                </nav>
+                        {/* prosta ikona burgera bez bibliotek */}
+                        <span className="block w-5 h-0.5 bg-white mb-1.5 rounded"/>
+                        <span className="block w-5 h-0.5 bg-white mb-1.5 rounded"/>
+                        <span className="block w-5 h-0.5 bg-white rounded"/>
+                    </button>
+                </div>
+
+                {/* Mobile nav */}
+                {open && (
+                    <nav className="md:hidden pb-3 flex flex-col gap-1">
+                        <NavLink
+                            to="/catalog"
+                            end
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                            onClick={() => setOpen(false)}
+                        >
+                            Katalog
+                        </NavLink>
+                        <NavLink
+                            to="/me/reservations"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                            onClick={() => setOpen(false)}
+                        >
+                            Moje rezerwacje
+                        </NavLink>
+                        <NavLink
+                            to="/login"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                            onClick={() => setOpen(false)}
+                        >
+                            Logowanie
+                        </NavLink>
+                        <NavLink
+                            to="/register"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                            onClick={() => setOpen(false)}
+                        >
+                            Rejestracja
+                        </NavLink>
+                        <NavLink
+                            to="/staff"
+                            className={({isActive}) =>
+                                `${linkBase} ${isActive ? linkActive : linkInactive}`
+                            }
+                            onClick={() => setOpen(false)}
+                        >
+                            Panel opiekuna
+                        </NavLink>
+                    </nav>
+                )}
             </div>
         </header>
     );

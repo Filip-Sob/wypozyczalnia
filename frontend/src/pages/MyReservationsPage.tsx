@@ -192,7 +192,6 @@ export default function MyReservationsPage() {
         <section className="space-y-4">
             <header>
                 <h1 className="text-xl font-bold">Moje rezerwacje</h1>
-                <p className="text-slate-600">Dane z localStorage (frontend-only).</p>
             </header>
 
             {/* Pasek filtra i akcji */}
@@ -213,16 +212,31 @@ export default function MyReservationsPage() {
                 </div>
 
                 <div className="ml-auto flex gap-2">
-                    <button onClick={exportPdf} className="px-4 py-2 rounded bg-indigo-700 text-white">
+                    {/* Eksport PDF i CSV – niebieskie */}
+                    <button
+                        onClick={exportPdf}
+                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                    >
                         Eksport PDF
                     </button>
-                    <button onClick={exportCsv} className="px-4 py-2 rounded bg-slate-800 text-white">
+                    <button
+                        onClick={exportCsv}
+                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                    >
                         Eksport CSV
                     </button>
-                    <button onClick={refresh} className="px-4 py-2 rounded bg-black text-white">
+
+                    {/* Odśwież i Wyczyść filtr – szare */}
+                    <button
+                        onClick={refresh}
+                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
+                    >
                         Odśwież
                     </button>
-                    <button onClick={handleClear} className="px-4 py-2 rounded bg-black/5 text-slate-900">
+                    <button
+                        onClick={handleClear}
+                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
+                    >
                         Wyczyść filtr
                     </button>
                 </div>
@@ -238,7 +252,7 @@ export default function MyReservationsPage() {
                     <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {visible.map((r) => {
                             const dStatus = deriveStatus(r);
-                            const canCancel = dStatus === "scheduled" || dStatus === "active";
+                            const canCancel = dStatus === "scheduled";
                             const canReturn = dStatus === "active";
 
                             return (
@@ -274,7 +288,7 @@ export default function MyReservationsPage() {
                                             {canReturn && (
                                                 <button
                                                     onClick={() => handleReturn(r)}
-                                                    className="text-sm px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                                                    className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
                                                 >
                                                     Zwróć
                                                 </button>
@@ -306,13 +320,13 @@ export default function MyReservationsPage() {
                         <div className="flex justify-end gap-2">
                             <button
                                 onClick={() => setShowReturnModal(false)}
-                                className="rounded bg-black/5 text-slate-900 px-4 py-2"
+                                className="rounded bg-slate-600 text-white px-4 py-2 hover:bg-slate-700"
                             >
                                 Anuluj
                             </button>
                             <button
                                 onClick={confirmReturn}
-                                className="rounded bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700"
+                                className="rounded bg-blue-600 text-white px-4 py-2 hover:bg-blue-700"
                             >
                                 Potwierdź zwrot
                             </button>

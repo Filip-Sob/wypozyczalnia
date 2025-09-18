@@ -1,56 +1,55 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
-export default function LoginPage() {
-    const navigate = useNavigate();
-    const [form, setForm] = useState({ username: "", password: "" });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.username.trim() || !form.password.trim()) {
-            alert("Wprowadź login i hasło.");
-            return;
-        }
-
-        console.log("LOGIN →", form);
-
-        // przekierowanie do katalogu
-        navigate("/catalog");
-    };
-
+export default function RegisterPage() {
     return (
-        <section className="w-full max-w-md bg-white p-6 rounded-xl border">
-            <h1 className="text-2xl font-bold mb-4">Logowanie</h1>
-            <form onSubmit={handleSubmit} className="space-y-3">
-                <div>
+        <div className="w-full max-w-sm rounded-xl border bg-white p-6 shadow text-center">
+            <h1 className="text-xl font-bold mb-4">Rejestracja</h1> {/* zmniejszone i wyśrodkowane */}
+
+            <form className="space-y-4">
+                <div className="text-left">
                     <label className="block text-sm font-medium mb-1">Login</label>
                     <input
                         type="text"
-                        value={form.username}
-                        onChange={(e) => setForm({ ...form, username: e.target.value })}
-                        className="w-full rounded border px-3 py-2"
                         placeholder="np. jan.kowalski"
+                        className="w-full rounded border px-3 py-2"
                     />
                 </div>
 
-                <div>
+                <div className="text-left">
+                    <label className="block text-sm font-medium mb-1">E-mail</label>
+                    <input
+                        type="email"
+                        placeholder="np. jan.kowalski@edu.pl"
+                        className="w-full rounded border px-3 py-2"
+                    />
+                </div>
+
+                <div className="text-left">
                     <label className="block text-sm font-medium mb-1">Hasło</label>
                     <input
                         type="password"
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        className="w-full rounded border px-3 py-2"
                         placeholder="••••••"
+                        className="w-full rounded border px-3 py-2"
                     />
                 </div>
 
                 <button
                     type="submit"
-                    className="w-full rounded bg-black text-white px-4 py-2"
+                    className="w-full rounded bg-black text-white px-4 py-2 hover:bg-slate-800"
                 >
-                    Zaloguj się
+                    Zarejestruj się
                 </button>
             </form>
-        </section>
+
+            <p className="text-sm text-slate-600 mt-4">
+                Masz już konto?{" "}
+                <Link
+                    to="/login"
+                    className="text-blue-600 hover:underline font-medium"
+                >
+                    Zaloguj się
+                </Link>
+            </p>
+        </div>
     );
 }

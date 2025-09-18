@@ -1,296 +1,315 @@
 // src/pages/CatalogPage.tsx
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import Button from "../components/ui/Button";
 import { addReservation } from "../utils/reservationsStorage";
-import { Link } from "react-router-dom";
-import { Laptop, Camera, Projector, Mic, Tablet } from "lucide-react";
-
-/** ===== Mock: dane sprzętu ===== */
-type EquipmentType = "laptop" | "camera" | "projector" | "microphone" | "other";
-type EquipmentStatus = "available" | "reserved" | "borrowed" | "service" | "broken";
-type EquipmentLocation = "Lab1" | "Lab2" | "warehouse";
+import { Laptop, Video, Projector } from "lucide-react"; // ikonki
 
 type Equipment = {
     id: number;
     name: string;
-    type: EquipmentType;
-    status: EquipmentStatus;
-    location: EquipmentLocation;
-    serial: string;
-    specs: string;
+    type: "Laptop" | "Kamera" | "Projektor";
+    specification: string;
+    serialNumber: string;
+    location: string;
+    status: "Dostępny" | "Wypożyczony" | "Zarezerwowany";
 };
 
 const MOCK_DATA: Equipment[] = [
-    { id: 1, name: "Laptop Dell", type: "laptop", status: "available", location: "Lab1", serial: "LAP-12345", specs: "Intel i5, 8GB RAM, 256GB SSD" },
-    { id: 2, name: "Kamera Sony", type: "camera", status: "borrowed", location: "Lab2", serial: "CAM-98765", specs: "Full HD, 60fps, zoom x10" },
-    { id: 3, name: "Projektor Epson", type: "projector", status: "reserved", location: "warehouse", serial: "PRJ-55555", specs: "3000 lm, 1080p" },
-    { id: 4, name: "Mikrofon USB", type: "microphone", status: "available", location: "Lab2", serial: "MIC-11223", specs: "Cardioid, USB-C" },
-    { id: 5, name: "Tablet Samsung", type: "other", status: "service", location: "Lab1", serial: "TAB-65432", specs: "10.5\", 128GB" },
-    { id: 6, name: "Laptop Lenovo", type: "laptop", status: "broken", location: "warehouse", serial: "LAP-77777", specs: "Ryzen 5, 16GB RAM, 512GB SSD" },
+    {
+        id: 1,
+        name: "Laptop Dell",
+        type: "Laptop",
+        specification: "Intel i5, 8GB RAM, 256GB SSD",
+        serialNumber: "LAP-12345",
+        location: "Laboratorium 1",
+        status: "Dostępny",
+    },
+    {
+        id: 2,
+        name: "Kamera Sony",
+        type: "Kamera",
+        specification: "Full HD, 60fps, zoom x10",
+        serialNumber: "CAM-98765",
+        location: "Laboratorium 2",
+        status: "Wypożyczony",
+    },
+    {
+        id: 3,
+        name: "Projektor Epson",
+        type: "Projektor",
+        specification: "3000 lm, 1080p",
+        serialNumber: "PRJ-55555",
+        location: "Magazyn",
+        status: "Zarezerwowany",
+    },
 ];
 
-/** ===== Pomocnicze labelki ===== */
-function labelType(t: EquipmentType) {
-    switch (t) {
-        case "laptop": return "Laptop";
-        case "camera": return "Kamera";
-        case "projector": return "Projektor";
-        case "microphone": return "Mikrofon";
-        default: return "Inny";
-    }
-}
-function labelStatus(s: EquipmentStatus) {
-    switch (s) {
-        case "available": return "Dostępny";
-        case "reserved": return "Zarezerwowany";
-        case "borrowed": return "Wypożyczony";
-        case "service": return "Serwis";
-        case "broken": return "Uszkodzony";
-    }
-}
-function labelLocation(l: EquipmentLocation) {
-    switch (l) {
-        case "Lab1": return "Laboratorium 1";
-        case "Lab2": return "Laboratorium 2";
-        case "warehouse": return "Magazyn";
-    }
-}
-function pillForStatus(s: EquipmentStatus) {
-    switch (s) {
-        case "available": return "bg-emerald-100 text-emerald-700";
-        case "reserved": return "bg-amber-100 text-amber-700";
-        case "borrowed": return "bg-blue-100 text-blue-700";
-        case "service": return "bg-purple-100 text-purple-700";
-        case "broken": return "bg-rose-100 text-rose-700";
+// === Mapowanie statusu na wygląd pigułki ===
+function statusPillClasses(status: Equipment["status"]) {
+    switch (status) {
+        case "Dostępny":
+            return "bg-emerald-100 text-emerald-700";
+        case "Wypożyczony":
+            return "bg-indigo-100 text-indigo-700";
+        case "Zarezerwowany":
+            return "bg-amber-100 text-amber-700";
     }
 }
 
-/** ===== Ikony dla typów ===== */
-function iconForType(type: EquipmentType) {
+// === Mapowanie typów na ikonki ===
+function equipmentIcon(type: Equipment["type"]) {
     switch (type) {
-        case "laptop": return <Laptop className="w-5 h-5 text-slate-500" />;
-        case "camera": return <Camera className="w-5 h-5 text-slate-500" />;
-        case "projector": return <Projector className="w-5 h-5 text-slate-500" />;
-        case "microphone": return <Mic className="w-5 h-5 text-slate-500" />;
-        default: return <Tablet className="w-5 h-5 text-slate-500" />;
+        case "Laptop":
+            return <Laptop className="w-6 h-6 text-slate-600" />;
+        case "Kamera":
+            return <Video className="w-6 h-6 text-slate-600" />;
+        case "Projektor":
+            return <Projector className="w-6 h-6 text-slate-600" />;
+        default:
+            return null;
     }
 }
 
-/** ===== Komponent główny: Katalog ===== */
 export default function CatalogPage() {
-    const [q, setQ] = useState("");
-    const [type, setType] = useState<EquipmentType | "all">("all");
-    const [status, setStatus] = useState<EquipmentStatus | "any">("any");
-    const [location, setLocation] = useState<EquipmentLocation | "any">("any");
-    const [allowShow, setAllowShow] = useState(false);
+    const [search, setSearch] = useState("");
+    const [type, setType] = useState("Wszystkie");
+    const [status, setStatus] = useState("Dowolny");
+    const [location, setLocation] = useState("Dowolna");
 
-    const [reserveItem, setReserveItem] = useState<Equipment | null>(null);
-    const [dateFrom, setDateFrom] = useState<string>("");
-    const [dateTo, setDateTo] = useState<string>("");
+    const [results, setResults] = useState<Equipment[]>([]);
+    const [searched, setSearched] = useState(false); // 👈 kontrola wyświetlania listy
 
-    const MAX_DAYS = 14;
+    // modal rezerwacji
+    const [showModal, setShowModal] = useState(false);
+    const [selected, setSelected] = useState<Equipment | null>(null);
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
 
-    const onSearch = () => setAllowShow(true);
-    const onClear = () => {
-        setQ(""); setType("all"); setStatus("any"); setLocation("any"); setAllowShow(false);
+    const handleSearch = () => {
+        let filtered = MOCK_DATA;
+
+        if (search) {
+            filtered = filtered.filter((item) =>
+                item.name.toLowerCase().includes(search.toLowerCase())
+            );
+        }
+        if (type !== "Wszystkie") {
+            filtered = filtered.filter((item) => item.type === type);
+        }
+        if (status !== "Dowolny") {
+            filtered = filtered.filter((item) => item.status === status);
+        }
+        if (location !== "Dowolna") {
+            filtered = filtered.filter((item) => item.location === location);
+        }
+
+        setResults(filtered);
+        setSearched(true);
     };
 
-    const results = useMemo(() => {
-        if (!allowShow) return [];
-        return MOCK_DATA.filter((it) => {
-            const matchesQuery = !q || `${it.name} ${it.serial} ${it.specs}`.toLowerCase().includes(q.toLowerCase());
-            const matchesType = type === "all" || it.type === type;
-            const matchesStatus = status === "any" || it.status === status;
-            const matchesLocation = location === "any" || it.location === location;
-            return matchesQuery && matchesType && matchesStatus && matchesLocation;
-        });
-    }, [allowShow, q, type, status, location]);
+    const handleReset = () => {
+        setSearch("");
+        setType("Wszystkie");
+        setStatus("Dowolny");
+        setLocation("Dowolna");
+        setResults([]);
+        setSearched(false);
+    };
 
-    const openReserve = (item: Equipment) => {
-        setReserveItem(item);
+    const handleReserve = (eq: Equipment) => {
+        setSelected(eq);
         setDateFrom("");
         setDateTo("");
-    };
-    const closeReserve = () => {
-        setReserveItem(null);
-        setDateFrom("");
-        setDateTo("");
+        setShowModal(true);
     };
 
-    const daysBetween = (a: string, b: string) => {
-        if (!a || !b) return 0;
-        return Math.round((+new Date(b) - +new Date(a)) / (1000 * 60 * 60 * 24));
-    };
+    const confirmReserve = () => {
+        if (!selected || !dateFrom || !dateTo) return;
+        const diffDays =
+            (new Date(dateTo).getTime() - new Date(dateFrom).getTime()) /
+            (1000 * 60 * 60 * 24);
 
-    const canConfirm =
-        !!dateFrom &&
-        !!dateTo &&
-        new Date(dateTo) >= new Date(dateFrom) &&
-        daysBetween(dateFrom, dateTo) <= MAX_DAYS;
+        if (diffDays > 14) {
+            alert("⛔ Maksymalny okres rezerwacji to 14 dni.");
+            return;
+        }
 
-    const confirmReservation = () => {
-        if (!reserveItem) return;
         addReservation({
-            equipmentId: reserveItem.id,
-            equipmentName: reserveItem.name,
-            equipmentType: reserveItem.type,
-            serialNumber: reserveItem.serial,
-            location: reserveItem.location,
+            equipmentId: selected.id,
+            equipmentName: selected.name,
+            equipmentType: selected.type,
+            serialNumber: selected.serialNumber,
+            location: selected.location,
             dateFrom,
             dateTo,
         });
-        alert(`Zarezerwowano: ${reserveItem.name}\nOd: ${dateFrom}\nDo: ${dateTo}`);
-        closeReserve();
+
+        setShowModal(false);
+        setSelected(null);
+        alert("✅ Rezerwacja zapisana! Sprawdź w 'Moje rezerwacje'.");
     };
 
     return (
-        <section className="space-y-6">
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-800">Katalog sprzętu</h1>
-            <p className="text-slate-600">Wyszukuj i filtruj zasoby. (Na razie mock; backend podepniemy później).</p>
+        <section className="space-y-4">
+            <header>
+                <h1 className="text-xl font-bold">Katalog sprzętu</h1>
+            </header>
 
-            {/* Pasek filtrów */}
-            <div className="rounded-xl border bg-white shadow-sm p-4 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            {/* Pasek wyszukiwania i filtrów */}
+            <div className="rounded-xl border bg-white p-6 flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div>
-                        <label className="block text-sm font-medium mb-1">Szukaj</label>
-                        <input className="w-full rounded-lg border px-3 py-2" placeholder="np. Kamera Sony"
-                               value={q} onChange={(e) => setQ(e.target.value)} />
+                        <label className="block text-sm font-medium">Szukaj</label>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="np. Kamera Sony"
+                            className="mt-2 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base px-3 py-2.5"
+                        />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Typ</label>
-                        <select className="w-full rounded-lg border px-3 py-2"
-                                value={type} onChange={(e) => setType(e.target.value as EquipmentType | "all")}>
-                            <option value="all">Wszystkie</option>
-                            <option value="laptop">Laptop</option>
-                            <option value="camera">Kamera</option>
-                            <option value="projector">Projektor</option>
-                            <option value="microphone">Mikrofon</option>
-                            <option value="other">Inny</option>
+                        <label className="block text-sm font-medium">Typ</label>
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value)}
+                            className="mt-2 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base px-3 py-2.5"
+                        >
+                            <option>Wszystkie</option>
+                            <option>Laptop</option>
+                            <option>Kamera</option>
+                            <option>Projektor</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Status</label>
-                        <select className="w-full rounded-lg border px-3 py-2"
-                                value={status} onChange={(e) => setStatus(e.target.value as EquipmentStatus | "any")}>
-                            <option value="any">Dowolny</option>
-                            <option value="available">Dostępny</option>
-                            <option value="reserved">Zarezerwowany</option>
-                            <option value="borrowed">Wypożyczony</option>
-                            <option value="service">Serwis</option>
-                            <option value="broken">Uszkodzony</option>
+                        <label className="block text-sm font-medium">Status</label>
+                        <select
+                            value={status}
+                            onChange={(e) => setStatus(e.target.value)}
+                            className="mt-2 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base px-3 py-2.5"
+                        >
+                            <option>Dowolny</option>
+                            <option>Dostępny</option>
+                            <option>Wypożyczony</option>
+                            <option>Zarezerwowany</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Lokalizacja</label>
-                        <select className="w-full rounded-lg border px-3 py-2"
-                                value={location} onChange={(e) => setLocation(e.target.value as EquipmentLocation | "any")}>
-                            <option value="any">Dowolna</option>
-                            <option value="Lab1">Laboratorium 1</option>
-                            <option value="Lab2">Laboratorium 2</option>
-                            <option value="warehouse">Magazyn</option>
+                        <label className="block text-sm font-medium">Lokalizacja</label>
+                        <select
+                            value={location}
+                            onChange={(e) => setLocation(e.target.value)}
+                            className="mt-2 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base px-3 py-2.5"
+                        >
+                            <option>Dowolna</option>
+                            <option>Laboratorium 1</option>
+                            <option>Laboratorium 2</option>
+                            <option>Magazyn</option>
                         </select>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={onClear} className="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 px-4 py-2 transition">
+
+                <div className="flex gap-4">
+                    <Button variant="outline" className="px-5 py-2.5 text-base" onClick={handleReset}>
                         Wyczyść
-                    </button>
-                    <button onClick={onSearch} className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 transition">
+                    </Button>
+                    <Button className="px-5 py-2.5 text-base" onClick={handleSearch}>
                         Szukaj
-                    </button>
+                    </Button>
                 </div>
             </div>
 
-            {/* Wyniki */}
-            {!allowShow ? (
-                <div className="rounded-xl border bg-white p-3 text-slate-600">
-                    Brak wyników (mock). Kliknij „Szukaj”, aby wyszukać sprzęt.
-                </div>
-            ) : results.length === 0 ? (
-                <div className="rounded-xl border bg-white p-3 text-slate-600">
-                    Nic nie znaleziono dla wybranych filtrów.
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {results.map((it) => {
-                        const available = it.status === "available";
-                        return (
-                            <div key={it.id} className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition space-y-2">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-2">
-                                        {iconForType(it.type)}
-                                        <div>
-                                            <h3 className="font-semibold text-slate-800">{it.name}</h3>
-                                            <p className="text-slate-500 text-sm">{labelType(it.type)}</p>
+            {/* Lista sprzętu */}
+            {searched && (
+                <div className="rounded-xl border bg-white p-3">
+                    {results.length === 0 ? (
+                        <p className="text-slate-600">Brak sprzętu dla wybranych kryteriów.</p>
+                    ) : (
+                        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {results.map((eq) => (
+                                <li key={eq.id} className="border rounded-lg p-4">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex gap-2">
+                                            {equipmentIcon(eq.type)}
+                                            <div>
+                                                <h3 className="font-semibold">{eq.name}</h3>
+                                                <p className="text-sm text-slate-600">{eq.type}</p>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Specyfikacja: {eq.specification}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    Nr seryjny: {eq.serialNumber}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    Lokalizacja: {eq.location}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <span className={`px-2 py-1 text-xs rounded-lg font-medium ${pillForStatus(it.status)}`}>
-                    {labelStatus(it.status)}
-                  </span>
-                                </div>
-                                <ul className="text-sm text-slate-700 space-y-1">
-                                    <li><span className="text-slate-500">Lokalizacja:</span> {labelLocation(it.location)}</li>
-                                    <li><span className="text-slate-500">Nr seryjny:</span> {it.serial}</li>
-                                    <li><span className="text-slate-500">Specyfikacja:</span> {it.specs}</li>
-                                </ul>
-                                <div className="pt-2 flex gap-2">
-                                    {available ? (
-                                        <button onClick={() => openReserve(it)} className="flex-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm transition">
-                                            Zarezerwuj
-                                        </button>
-                                    ) : (
-                                        <span className="flex-1 inline-block text-center rounded-lg bg-slate-200 text-slate-700 px-3 py-2 text-sm">
-                      Niedostępny
+                                        <span
+                                            className={`text-xs px-2 py-1 rounded ${statusPillClasses(eq.status)}`}
+                                        >
+                      {eq.status}
                     </span>
+                                    </div>
+
+                                    {eq.status === "Dostępny" && (
+                                        <div className="mt-3">
+                                            <Button className="px-3 py-1 text-sm" onClick={() => handleReserve(eq)}>
+                                                Zarezerwuj
+                                            </Button>
+                                        </div>
                                     )}
-                                    <Link to={`/equipment/${it.id}/history`}
-                                          className="flex-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 text-sm text-center transition">
-                                        Historia
-                                    </Link>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             )}
 
-            {/* ===== Modal rezerwacji ===== */}
-            {reserveItem && (
+            {/* Modal rezerwacji */}
+            {showModal && selected && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/40" onClick={closeReserve} />
-                    <div className="relative z-10 w-full max-w-lg rounded-xl border bg-white p-6 shadow-lg">
-                        <h3 className="text-lg font-semibold mb-1">Rezerwacja</h3>
-                        <p className="text-slate-600 mb-4">
-                            Sprzęt: <span className="font-medium">{reserveItem.name}</span>
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Od</label>
-                                <input type="date" className="w-full rounded-lg border px-3 py-2"
-                                       value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Do</label>
-                                <input type="date" className="w-full rounded-lg border px-3 py-2"
-                                       value={dateTo} onChange={(e) => setDateTo(e.target.value)} min={dateFrom || undefined} />
-                            </div>
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowModal(false)} />
+                    <div className="relative z-10 w-full max-w-lg rounded-xl border bg-white p-5">
+                        <h3 className="text-lg font-semibold mb-4">
+                            Rezerwacja: {selected.name}
+                        </h3>
+
+                        <div className="mb-3">
+                            <label className="block text-sm font-medium">Od kiedy:</label>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="mt-1 block w-full border rounded px-3 py-2"
+                            />
                         </div>
-                        <div className="mt-3 text-sm">
-                            {dateFrom && dateTo && new Date(dateTo) < new Date(dateFrom) && (
-                                <p className="text-rose-600">Data „Do” nie może być wcześniejsza niż „Od”.</p>
-                            )}
-                            {dateFrom && dateTo && daysBetween(dateFrom, dateTo) > MAX_DAYS && (
-                                <p className="text-rose-600">Maksymalny czas wypożyczenia to {MAX_DAYS} dni.</p>
-                            )}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium">Do kiedy:</label>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="mt-1 block w-full border rounded px-3 py-2"
+                            />
                         </div>
-                        <div className="mt-5 flex justify-end gap-2">
-                            <button onClick={closeReserve} className="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 px-4 py-2 transition">
+
+                        <div className="flex justify-end gap-3">
+                            <Button
+                                variant="outline"
+                                className="px-5 py-2.5 text-base"
+                                onClick={() => setShowModal(false)}
+                            >
                                 Anuluj
-                            </button>
-                            <button disabled={!canConfirm} onClick={confirmReservation}
-                                    className={`rounded-lg px-4 py-2 text-white transition ${canConfirm ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-400 cursor-not-allowed"}`}>
+                            </Button>
+                            <Button
+                                className="px-5 py-2.5 text-base"
+                                onClick={confirmReserve}
+                            >
                                 Potwierdź
-                            </button>
+                            </Button>
                         </div>
+
                     </div>
                 </div>
             )}
