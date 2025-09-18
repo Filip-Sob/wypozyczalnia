@@ -28,7 +28,7 @@ public class SecurityConfig {
                         // Rejestracja publiczna
                         .requestMatchers("/api/users/register").permitAll()
                         // Zarządzanie sprzętem tylko dla ADMIN/STAFF
-                        .requestMatchers("/api/devices/**").hasAnyRole("ADMIN","STAFF")
+                        .requestMatchers("/api/devices/**").authenticated()
                         // Wypożyczenia i rezerwacje wymagają zalogowania
                         .requestMatchers("/api/loans/**","/api/reservations/**").authenticated()
                         // reszta też wymaga zalogowania
