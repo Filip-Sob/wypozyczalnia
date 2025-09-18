@@ -14,7 +14,7 @@ public class Device {
     private String serialNumber;
     private String location;
 
-    @Enumerated(EnumType.STRING)
+    //@Enumerated(EnumType.STRING)
     private DeviceStatus status = DeviceStatus.AVAILABLE; // domyślnie dostępny
 
     // --- Gettery i settery ---
