@@ -53,8 +53,8 @@ public class LoanController {
     }
 
     /** Lista wypożyczeń (paginowana) */
-    @GetMapping
-    public Page<Loan> list(Pageable pageable) {
-        return loanRepo.findAll(pageable);
+    @GetMapping("/device/{deviceId}")
+    public Page<Loan> historyByDevice(@PathVariable Long deviceId, Pageable pageable) {
+        return loanRepo.findByDeviceIdOrderByStartDateDesc(deviceId, pageable);
     }
 }
