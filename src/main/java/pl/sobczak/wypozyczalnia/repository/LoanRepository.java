@@ -10,7 +10,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface LoanRepository extends JpaRepository<Loan, Long> {
+
     List<Loan> findByUserId(Long userId);
+
     List<Loan> findByDeviceIdAndStatus(Long deviceId, LoanStatus status);
 
     @Query("""
@@ -24,4 +26,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
                                         @Param("from") LocalDate from,
                                         @Param("to") LocalDate to,
                                         @Param("active") LoanStatus active);
+
+    // 🔹 używane przez scheduler przypomnień
+    List<Loan> findByStatusAndReturnDateIsNullAndDueDate(LoanStatus status, LocalDate dueDate);
 }

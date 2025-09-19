@@ -4,8 +4,11 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
 import pl.sobczak.wypozyczalnia.dto.LoanCreateDto;
+import pl.sobczak.wypozyczalnia.dto.LoanReturnDto;
 import pl.sobczak.wypozyczalnia.model.Loan;
 import pl.sobczak.wypozyczalnia.repository.LoanRepository;
 import pl.sobczak.wypozyczalnia.service.LoanService;
@@ -24,12 +27,13 @@ public class LoanController {
         this.loanRepo = loanRepo;
     }
 
+    /** Utworzenie wypożyczenia */
     @PostMapping
     public Loan create(@Valid @RequestBody LoanCreateDto dto) {
         return loanService.create(dto);
     }
 
-    /** Zwrot z opcjonalną datą i notatką oraz flagą uszkodzenia. */
+    /** Zwrot z opcjonalną datą i notatką oraz flagą uszkodzenia (query paramy) */
     @PostMapping("/{id}/return")
     public Loan returnLoan(@PathVariable Long id,
                            @RequestParam(required = false)
@@ -39,6 +43,16 @@ public class LoanController {
         return loanService.returnLoan(id, returnDate, note, damaged);
     }
 
+    /** Zwrot w JSON body (wygodne pod frontend) */
+    @PostMapping(value = "/{id}/return-json", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Loan returnLoanJson(@PathVariable Long id, @RequestBody LoanReturnDto dto) {
+        LocalDate rd = dto.returnDate();
+        String note = dto.note();
+        boolean damaged = Boolean.TRUE.equals(dto.damaged()); // null -> false
+        return loanService.returnLoan(id, rd, note, damaged);
+    }
+
+    /** Lista wypożyczeń (paginowana) */
     @GetMapping
     public Page<Loan> list(Pageable pageable) {
         return loanRepo.findAll(pageable);
