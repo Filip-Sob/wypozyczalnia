@@ -21,7 +21,6 @@ public class LoanService {
     private final DeviceRepository deviceRepo;
     private final UserRepository userRepo;
 
-    // ✅ RĘCZNY KONSTRUKTOR – rozwiązuje błąd "not initialized in the default constructor"
     public LoanService(LoanRepository loanRepo, DeviceRepository deviceRepo, UserRepository userRepo) {
         this.loanRepo = loanRepo;
         this.deviceRepo = deviceRepo;
@@ -60,17 +59,36 @@ public class LoanService {
         return loanRepo.save(loan);
     }
 
+    /** Zwrot z notatką i flagą uszkodzenia; returnDate opcjonalny (gdy null → dziś). */
     @Transactional
-    public Loan returnLoan(Long loanId, LocalDate returnDate) {
+    public Loan returnLoan(Long loanId, LocalDate returnDate, String note, boolean damaged) {
         var loan = loanRepo.findById(loanId)
                 .orElseThrow(() -> new IllegalStateException("Nie znaleziono wypożyczenia"));
-        if (loan.getStatus() != LoanStatus.ACTIVE) return loan;
 
-        loan.setReturnDate(returnDate);
-        loan.setStatus(returnDate.isAfter(loan.getDueDate()) ? LoanStatus.OVERDUE : LoanStatus.RETURNED);
+        if (loan.getReturnDate() != null || loan.getStatus() == LoanStatus.RETURNED || loan.getStatus() == LoanStatus.OVERDUE) {
+            throw new IllegalStateException("To wypożyczenie zostało już zwrócone.");
+        }
+        if (loan.getStatus() != LoanStatus.ACTIVE) {
+            throw new IllegalStateException("Wypożyczenie nie jest aktywne – nie można go zwrócić.");
+        }
 
+        LocalDate realReturn = (returnDate != null) ? returnDate : LocalDate.now();
+        loan.setReturnDate(realReturn);
+        if (note != null && !note.isBlank()) {
+            loan.setReturnNote(note);
+        }
+        loan.setDamageReported(damaged);
+
+        // status wypożyczenia
+        if (loan.getDueDate() != null && realReturn.isAfter(loan.getDueDate())) {
+            loan.setStatus(LoanStatus.OVERDUE);
+        } else {
+            loan.setStatus(LoanStatus.RETURNED);
+        }
+
+        // status urządzenia po zwrocie
         var device = loan.getDevice();
-        device.setStatus(DeviceStatus.AVAILABLE);
+        device.setStatus(damaged ? DeviceStatus.DAMAGED : DeviceStatus.AVAILABLE);
         deviceRepo.save(device);
 
         return loanRepo.save(loan);

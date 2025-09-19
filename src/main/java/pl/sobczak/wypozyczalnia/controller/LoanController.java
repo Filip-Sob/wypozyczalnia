@@ -19,7 +19,6 @@ public class LoanController {
     private final LoanService loanService;
     private final LoanRepository loanRepo;
 
-    // ✅ Ręczny konstruktor
     public LoanController(LoanService loanService, LoanRepository loanRepo) {
         this.loanService = loanService;
         this.loanRepo = loanRepo;
@@ -30,10 +29,14 @@ public class LoanController {
         return loanService.create(dto);
     }
 
+    /** Zwrot z opcjonalną datą i notatką oraz flagą uszkodzenia. */
     @PostMapping("/{id}/return")
     public Loan returnLoan(@PathVariable Long id,
-                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate) {
-        return loanService.returnLoan(id, returnDate);
+                           @RequestParam(required = false)
+                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate,
+                           @RequestParam(required = false) String note,
+                           @RequestParam(defaultValue = "false") boolean damaged) {
+        return loanService.returnLoan(id, returnDate, note, damaged);
     }
 
     @GetMapping

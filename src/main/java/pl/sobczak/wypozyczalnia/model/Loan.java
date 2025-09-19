@@ -21,9 +21,17 @@ public class Loan {
     private LocalDate returnDate;
 
     @Enumerated(EnumType.STRING)
-    private LoanStatus status = LoanStatus.ACTIVE;   // 👈 to jest potrzebne pole
+    private LoanStatus status = LoanStatus.ACTIVE;
 
-    // gettery i settery
+    /** Notatka/uwagi przy zwrocie (np. „pęknięta obudowa”) */
+    @Column(length = 1000)
+    private String returnNote;
+
+    /** Czy przy zwrocie zgłoszono uszkodzenie */
+    @Column(nullable = false)
+    private Boolean damageReported = false;
+
+    // --- gettery i settery ---
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -44,4 +52,10 @@ public class Loan {
 
     public LoanStatus getStatus() { return status; }
     public void setStatus(LoanStatus status) { this.status = status; }
+
+    public String getReturnNote() { return returnNote; }
+    public void setReturnNote(String returnNote) { this.returnNote = returnNote; }
+
+    public Boolean getDamageReported() { return damageReported; }
+    public void setDamageReported(Boolean damageReported) { this.damageReported = damageReported; }
 }
