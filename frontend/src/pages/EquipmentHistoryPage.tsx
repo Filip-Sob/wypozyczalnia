@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { getReservations, type Reservation } from "../utils/reservationsStorage";
 import { useMemo } from "react";
 
-// Format daty
+// Formatowanie daty
 function fmt(dateISO: string) {
     try {
         return new Date(dateISO).toISOString().slice(0, 10);
@@ -12,7 +12,7 @@ function fmt(dateISO: string) {
     }
 }
 
-// Etykiety dla statusów
+// Mapowanie statusów na etykiety PL
 function statusLabel(s: Reservation["status"]) {
     switch (s) {
         case "scheduled":
@@ -30,7 +30,7 @@ export default function EquipmentHistoryPage() {
     const { id } = useParams<{ id: string }>();
     const equipmentId = Number(id);
 
-    // pobranie i przefiltrowanie rezerwacji
+    // pobranie rezerwacji z localStorage dla danego urządzenia
     const history = useMemo(() => {
         return getReservations().filter((r) => r.equipmentId === equipmentId);
     }, [equipmentId]);
@@ -50,9 +50,12 @@ export default function EquipmentHistoryPage() {
     if (history.length === 0) {
         return (
             <section className="p-6">
-                <h1 className="text-xl font-bold">Historia wypożyczeń</h1>
-                <p>Brak historii dla tego sprzętu.</p>
-                <Link to="/" className="text-indigo-600 hover:underline">
+                <h1 className="text-2xl font-bold">Historia wypożyczeń</h1>
+                <p className="text-slate-600">Brak historii dla tego sprzętu.</p>
+                <Link
+                    to="/"
+                    className="inline-block mt-4 px-4 py-2 rounded bg-black text-white hover:bg-slate-800"
+                >
                     Wróć do katalogu
                 </Link>
             </section>

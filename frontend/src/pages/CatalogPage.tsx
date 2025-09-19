@@ -1,5 +1,6 @@
 // src/pages/CatalogPage.tsx
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Button from "../components/ui/Button";
 import { addReservation } from "../utils/reservationsStorage";
 import { Laptop, Video, Projector } from "lucide-react"; // ikonki
@@ -77,7 +78,7 @@ export default function CatalogPage() {
     const [location, setLocation] = useState("Dowolna");
 
     const [results, setResults] = useState<Equipment[]>([]);
-    const [searched, setSearched] = useState(false); // 👈 kontrola wyświetlania listy
+    const [searched, setSearched] = useState(false);
 
     // modal rezerwacji
     const [showModal, setShowModal] = useState(false);
@@ -227,38 +228,47 @@ export default function CatalogPage() {
                     ) : (
                         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {results.map((eq) => (
-                                <li key={eq.id} className="border rounded-lg p-4">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex gap-2">
-                                            {equipmentIcon(eq.type)}
-                                            <div>
-                                                <h3 className="font-semibold">{eq.name}</h3>
-                                                <p className="text-sm text-slate-600">{eq.type}</p>
-                                                <p className="text-xs text-slate-500 mt-1">
-                                                    Specyfikacja: {eq.specification}
-                                                </p>
-                                                <p className="text-xs text-slate-500">
-                                                    Nr seryjny: {eq.serialNumber}
-                                                </p>
-                                                <p className="text-xs text-slate-500">
-                                                    Lokalizacja: {eq.location}
-                                                </p>
+                                <li key={eq.id} className="border rounded-lg p-4 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex gap-2">
+                                                {equipmentIcon(eq.type)}
+                                                <div>
+                                                    <h3 className="font-semibold">{eq.name}</h3>
+                                                    <p className="text-sm text-slate-600">{eq.type}</p>
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        Specyfikacja: {eq.specification}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">
+                                                        Nr seryjny: {eq.serialNumber}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">
+                                                        Lokalizacja: {eq.location}
+                                                    </p>
+                                                </div>
                                             </div>
+                                            <span
+                                                className={`text-xs px-2 py-1 rounded ${statusPillClasses(eq.status)}`}
+                                            >
+                                                {eq.status}
+                                            </span>
                                         </div>
-                                        <span
-                                            className={`text-xs px-2 py-1 rounded ${statusPillClasses(eq.status)}`}
-                                        >
-                      {eq.status}
-                    </span>
                                     </div>
 
-                                    {eq.status === "Dostępny" && (
-                                        <div className="mt-3">
+                                    <div className="mt-3 flex gap-2">
+                                        {eq.status === "Dostępny" && (
                                             <Button className="px-3 py-1 text-sm" onClick={() => handleReserve(eq)}>
                                                 Zarezerwuj
                                             </Button>
-                                        </div>
-                                    )}
+                                        )}
+                                        {/* Nowa opcja Historia */}
+                                        <Link
+                                            to={`/equipment/${eq.id}/history`}
+                                            className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 text-center"
+                                        >
+                                            Historia
+                                        </Link>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
@@ -309,7 +319,6 @@ export default function CatalogPage() {
                                 Potwierdź
                             </Button>
                         </div>
-
                     </div>
                 </div>
             )}
