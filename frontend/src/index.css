@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* Reset + globalne style */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #213547;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+
+  /* 🔸 ważne: pozwalamy przewijać, żeby stopka NIGDY nie była ucięta */
+  overflow-y: auto;
+
+  /* żadnego globalnego tła – tła są ustawiane w Layout.tsx / AuthLayout.tsx */
+  background: transparent;
+}
+
+a {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
