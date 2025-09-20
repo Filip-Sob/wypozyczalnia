@@ -1,3 +1,4 @@
+// src/main/java/pl/sobczak/wypozyczalnia/controller/DeviceController.java
 package pl.sobczak.wypozyczalnia.controller;
 
 import jakarta.validation.Valid;
@@ -13,6 +14,8 @@ import pl.sobczak.wypozyczalnia.model.Device;
 import pl.sobczak.wypozyczalnia.model.DeviceStatus;
 import pl.sobczak.wypozyczalnia.repository.DeviceRepository;
 import pl.sobczak.wypozyczalnia.repository.spec.DeviceSpecifications;
+
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/devices")
@@ -35,7 +38,6 @@ public class DeviceController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,desc") String sort
     ) {
-        // sort: "pole,kierunek" np. "name,asc"
         Sort sortObj;
         try {
             var parts = sort.split(",", 2);
@@ -66,7 +68,7 @@ public class DeviceController {
         return deviceRepository.findAll(spec, pageable);
     }
 
-    /** Dodawanie urządzenia (z kontrolą duplikatu numeru seryjnego) */
+    /** Dodawanie urządzenia */
     @PostMapping
     public Device create(@Valid @RequestBody DeviceCreateDto dto) {
         if (deviceRepository.existsBySerialNumber(dto.serialNumber())) {
@@ -77,7 +79,37 @@ public class DeviceController {
         d.setType(dto.type());
         d.setSerialNumber(dto.serialNumber());
         d.setLocation(dto.location());
-        d.setStatus(DeviceStatus.AVAILABLE); // albo DOSTEPNY – zgodnie z Twoim enumem
+        d.setStatus(DeviceStatus.AVAILABLE);
         return deviceRepository.save(d);
+    }
+
+    /** Pobranie szczegółów urządzenia */
+    @GetMapping("/{id}")
+    public Device getById(@PathVariable Long id) {
+        return deviceRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Nie znaleziono urządzenia id=" + id));
+    }
+
+    /** Aktualizacja urządzenia */
+    @PutMapping("/{id}")
+    public Device update(@PathVariable Long id, @Valid @RequestBody DeviceCreateDto dto) {
+        Device d = deviceRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Nie znaleziono urządzenia id=" + id));
+
+        d.setName(dto.name());
+        d.setType(dto.type());
+        d.setSerialNumber(dto.serialNumber());
+        d.setLocation(dto.location());
+        // status nie jest w DTO, więc zostaje stary
+        return deviceRepository.save(d);
+    }
+
+    /** Usuwanie urządzenia */
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        if (!deviceRepository.existsById(id)) {
+            throw new NoSuchElementException("Nie znaleziono urządzenia id=" + id);
+        }
+        deviceRepository.deleteById(id);
     }
 }

@@ -1,171 +1,133 @@
-import { useState } from "react";
+// src/pages/StaffPage.tsx
+import { useEffect, useState } from "react";
+import { api, type Device } from "../utils/api";
 
-// ====== Typy i mocki ======
-type EquipmentType = "laptop" | "camera" | "projector" | "microphone" | "other";
-type EquipmentStatus = "available" | "reserved" | "borrowed" | "service" | "broken";
-type EquipmentLocation = "Lab1" | "Lab2" | "warehouse";
-
-type Equipment = {
-    id: number;
-    name: string;
-    type: EquipmentType;
-    status: EquipmentStatus;
-    location: EquipmentLocation;
-    serial: string;
-    specs: string;
-};
-
-const INITIAL_ITEMS: Equipment[] = [
-    {
-        id: 1,
-        name: "Laptop Dell",
-        type: "laptop",
-        status: "available",
-        location: "Lab1",
-        serial: "LAP-12345",
-        specs: "Intel i5, 8GB RAM, 256GB SSD",
-    },
-    {
-        id: 2,
-        name: "Kamera Sony",
-        type: "camera",
-        status: "borrowed",
-        location: "Lab2",
-        serial: "CAM-98765",
-        specs: "Full HD, 60fps, zoom x10",
-    },
-    {
-        id: 3,
-        name: "Projektor Epson",
-        type: "projector",
-        status: "reserved",
-        location: "warehouse",
-        serial: "PRJ-55555",
-        specs: "3000 lm, 1080p",
-    },
-];
-
-// ====== Pomocnicze labelki (UI) ======
-function labelType(t: EquipmentType) {
-    switch (t) {
-        case "laptop": return "Laptop";
-        case "camera": return "Kamera";
-        case "projector": return "Projektor";
-        case "microphone": return "Mikrofon";
-        default: return "Inny";
-    }
+/* ===== Mapowanie statusów na ładne etykiety/kolory ===== */
+function labelStatusUI(s: string) {
+    const v = (s || "").toUpperCase();
+    if (["DOSTĘPNY", "AVAILABLE"].includes(v)) return "Dostępny";
+    if (["ZAREZERWOWANY", "RESERVED"].includes(v)) return "Zarezerwowany";
+    if (["WYPOŻYCZONY", "LOANED"].includes(v)) return "Wypożyczony";
+    if (["SERWIS", "MAINTENANCE"].includes(v)) return "Serwis";
+    if (["USZKODZONY", "DAMAGED"].includes(v)) return "Uszkodzony";
+    if (["ZGUBIONY", "LOST"].includes(v)) return "Zgubiony";
+    return s || "-";
 }
-function labelStatusUI(s: EquipmentStatus) {
-    switch (s) {
-        case "available": return "Dostępny";
-        case "reserved": return "Zarezerwowany";
-        case "borrowed": return "Wypożyczony";
-        case "service": return "Serwis";
-        case "broken": return "Uszkodzony";
-    }
+function labelStatusAscii(s: string) {
+    const v = (s || "").toUpperCase();
+    if (["DOSTĘPNY", "AVAILABLE"].includes(v)) return "Dostepny";
+    if (["ZAREZERWOWANY", "RESERVED"].includes(v)) return "Zarezerwowany";
+    if (["WYPOŻYCZONY", "LOANED"].includes(v)) return "Wypozyczony";
+    if (["SERWIS", "MAINTENANCE"].includes(v)) return "Serwis";
+    if (["USZKODZONY", "DAMAGED"].includes(v)) return "Uszkodzony";
+    if (["ZGUBIONY", "LOST"].includes(v)) return "Zgubiony";
+    return s || "-";
 }
-function labelLocation(l: EquipmentLocation) {
-    switch (l) {
-        case "Lab1": return "Laboratorium 1";
-        case "Lab2": return "Laboratorium 2";
-        case "warehouse": return "Magazyn";
-    }
-}
-function statusPill(status: EquipmentStatus) {
-    switch (status) {
-        case "available": return "bg-emerald-100 text-emerald-700";
-        case "reserved": return "bg-amber-100 text-amber-700";
-        case "borrowed": return "bg-blue-100 text-blue-700";
-        case "service": return "bg-purple-100 text-purple-700";
-        case "broken": return "bg-rose-100 text-rose-700";
-    }
+function statusPill(status: string) {
+    const v = (status || "").toUpperCase();
+    if (["DOSTĘPNY", "AVAILABLE"].includes(v)) return "bg-emerald-100 text-emerald-700";
+    if (["ZAREZERWOWANY", "RESERVED"].includes(v)) return "bg-amber-100 text-amber-700";
+    if (["WYPOŻYCZONY", "LOANED"].includes(v)) return "bg-blue-100 text-blue-700";
+    if (["SERWIS", "MAINTENANCE"].includes(v)) return "bg-purple-100 text-purple-700";
+    if (["USZKODZONY", "DAMAGED", "ZGUBIONY", "LOST"].includes(v))
+        return "bg-rose-100 text-rose-700";
+    return "bg-slate-100 text-slate-700";
 }
 
-// ====== Etykiety bez ogonków (do PDF/CSV) ======
-function labelStatusAscii(s: EquipmentStatus) {
-    switch (s) {
-        case "available": return "Dostepny";
-        case "reserved": return "Zarezerwowany";
-        case "borrowed": return "Wypozyczony";
-        case "service": return "Serwis";
-        case "broken": return "Uszkodzony";
-    }
-}
-
+/* ===== Komponent ===== */
 export default function StaffPage() {
-    const [items, setItems] = useState<Equipment[]>(INITIAL_ITEMS);
+    const [items, setItems] = useState<Device[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // ===== Dodawanie =====
+    // Dodawanie
     const [showAddForm, setShowAddForm] = useState(false);
-    const [form, setForm] = useState<Equipment>({
-        id: 0,
+    const [form, setForm] = useState({
         name: "",
-        type: "laptop",
-        status: "available",
-        location: "Lab1",
-        serial: "",
-        specs: "",
+        type: "",
+        serialNumber: "",
+        location: "",
     });
 
-    const handleAdd = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.name.trim() || !form.serial.trim()) {
-            alert("Nazwa i numer seryjny są wymagane.");
-            return;
-        }
-        const newItem: Equipment = { ...form, id: Date.now() };
-        setItems((prev) => [newItem, ...prev]);
-        setForm({
-            id: 0,
-            name: "",
-            type: "laptop",
-            status: "available",
-            location: "Lab1",
-            serial: "",
-            specs: "",
-        });
-        setShowAddForm(false);
-    };
-
-    // ===== Edycja =====
+    // Edycja
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [editForm, setEditForm] = useState<Equipment>({
-        id: 0,
+    const [editForm, setEditForm] = useState({
         name: "",
-        type: "laptop",
-        status: "available",
-        location: "Lab1",
-        serial: "",
-        specs: "",
+        type: "",
+        serialNumber: "",
+        location: "",
     });
 
-    const startEdit = (it: Equipment) => {
-        setEditingId(it.id);
-        setEditForm({ ...it });
+    /* ===== API ===== */
+    const loadDevices = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const page = await api.devices.search({ size: 100, sort: "id,desc" });
+            setItems(page.content);
+        } catch (e: any) {
+            console.error(e);
+            setError(e?.message || "Błąd pobierania listy urządzeń");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const cancelEdit = () => setEditingId(null);
-
-    const saveEdit = (e: React.FormEvent) => {
+    const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editForm.name.trim() || !editForm.serial.trim()) {
-            alert("Nazwa i numer seryjny są wymagane.");
+        if (!form.name.trim() || !form.type.trim() || !form.serialNumber.trim() || !form.location.trim()) {
+            alert("Wypełnij wszystkie pola: nazwa, typ, numer seryjny, lokalizacja.");
             return;
         }
-        setItems((prev) => prev.map((x) => (x.id === editingId ? { ...editForm } : x)));
-        setEditingId(null);
+        try {
+            const created = await api.devices.create(form);
+            setItems((prev) => [created, ...prev]);
+            setForm({ name: "", type: "", serialNumber: "", location: "" });
+            setShowAddForm(false);
+        } catch (e: any) {
+            alert("Błąd przy dodawaniu: " + (e?.message || "Nieznany"));
+        }
     };
 
-    // ===== Eksport CSV =====
+    const saveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingId) return;
+        if (!editForm.name.trim() || !editForm.type.trim() || !editForm.serialNumber.trim() || !editForm.location.trim()) {
+            alert("Wypełnij wszystkie pola: nazwa, typ, numer seryjny, lokalizacja.");
+            return;
+        }
+        try {
+            const updated = await api.devices.update(editingId, editForm);
+            setItems((prev) => prev.map((d) => (d.id === editingId ? updated : d)));
+            setEditingId(null);
+        } catch (e: any) {
+            alert("Błąd przy zapisie: " + (e?.message || "Nieznany"));
+        }
+    };
+
+    const deleteDevice = async (id: number) => {
+        if (!window.confirm("Czy na pewno usunąć urządzenie?")) return;
+        try {
+            await api.devices.delete(id);
+            setItems((prev) => prev.filter((d) => d.id !== id));
+        } catch (e: any) {
+            alert("Błąd przy usuwaniu: " + (e?.message || "Nieznany"));
+        }
+    };
+
+    useEffect(() => {
+        loadDevices();
+    }, []);
+
+    /* ===== Eksport CSV ===== */
     const exportCsv = () => {
-        const header = ["name", "type", "status", "location", "serial", "specs"];
+        const header = ["name", "type", "status", "location", "serialNumber"];
         const rows = items.map((it) => ({
             name: it.name,
-            type: labelType(it.type),
+            type: it.type, // typ z BE – tekst
             status: labelStatusAscii(it.status),
-            location: labelLocation(it.location),
-            serial: it.serial,
-            specs: it.specs,
+            location: it.location,
+            serialNumber: it.serialNumber,
         }));
 
         const escape = (val: unknown) => {
@@ -188,7 +150,7 @@ export default function StaffPage() {
         URL.revokeObjectURL(url);
     };
 
-    // ===== Eksport PDF =====
+    /* ===== Eksport PDF ===== */
     const exportPdf = async () => {
         const jsPDFModule = await import("jspdf");
         const JsPDFCtor: any = (jsPDFModule as any).jsPDF || (jsPDFModule as any).default;
@@ -202,14 +164,13 @@ export default function StaffPage() {
         doc.setFontSize(10);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 58);
 
-        const head = [["Name", "Type", "Status", "Location", "Serial no.", "Specs"]];
+        const head = [["Name", "Type", "Status", "Location", "Serial no."]];
         const body = items.map((it) => [
             it.name,
-            labelType(it.type),
+            it.type,
             labelStatusAscii(it.status),
-            labelLocation(it.location),
-            it.serial,
-            it.specs,
+            it.location,
+            it.serialNumber,
         ]);
 
         autoTable(doc, {
@@ -217,6 +178,9 @@ export default function StaffPage() {
             body,
             startY: 80,
             styles: { fontSize: 9, cellPadding: 6 },
+            headStyles: { fillColor: [248, 250, 252], textColor: 15 },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            margin: { left: 40, right: 40 },
         });
 
         doc.save("equipment-list.pdf");
@@ -267,73 +231,49 @@ export default function StaffPage() {
 
                     <div>
                         <label className="block text-sm font-medium mb-1">Typ</label>
-                        <select
+                        <input
                             value={form.type}
-                            onChange={(e) => setForm({ ...form, type: e.target.value as EquipmentType })}
+                            onChange={(e) => setForm({ ...form, type: e.target.value })}
                             className="w-full rounded border px-3 py-2"
-                        >
-                            <option value="laptop">Laptop</option>
-                            <option value="camera">Kamera</option>
-                            <option value="projector">Projektor</option>
-                            <option value="microphone">Mikrofon</option>
-                            <option value="other">Inny</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Status</label>
-                        <select
-                            value={form.status}
-                            onChange={(e) => setForm({ ...form, status: e.target.value as EquipmentStatus })}
-                            className="w-full rounded border px-3 py-2"
-                        >
-                            <option value="available">Dostępny</option>
-                            <option value="reserved">Zarezerwowany</option>
-                            <option value="borrowed">Wypożyczony</option>
-                            <option value="service">Serwis</option>
-                            <option value="broken">Uszkodzony</option>
-                        </select>
+                            placeholder="np. laptop / kamera / projektor"
+                            required
+                        />
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium mb-1">Lokalizacja</label>
-                        <select
+                        <input
                             value={form.location}
-                            onChange={(e) => setForm({ ...form, location: e.target.value as EquipmentLocation })}
+                            onChange={(e) => setForm({ ...form, location: e.target.value })}
                             className="w-full rounded border px-3 py-2"
-                        >
-                            <option value="Lab1">Laboratorium 1</option>
-                            <option value="Lab2">Laboratorium 2</option>
-                            <option value="warehouse">Magazyn</option>
-                        </select>
+                            placeholder="np. Lab1 / Lab2 / Magazyn"
+                            required
+                        />
                     </div>
 
                     <div className="md:col-span-1">
                         <label className="block text-sm font-medium mb-1">Numer seryjny</label>
                         <input
-                            value={form.serial}
-                            onChange={(e) => setForm({ ...form, serial: e.target.value })}
+                            value={form.serialNumber}
+                            onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
                             className="w-full rounded border px-3 py-2"
                             placeholder="np. LAP-12345"
                             required
                         />
                     </div>
 
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium mb-1">Specyfikacja</label>
-                        <input
-                            value={form.specs}
-                            onChange={(e) => setForm({ ...form, specs: e.target.value })}
-                            className="w-full rounded border px-3 py-2"
-                            placeholder="np. i5 / 16GB / 512GB SSD"
-                        />
-                    </div>
-
                     <div className="md:col-span-3 flex justify-end gap-2">
-                        <button type="button" onClick={() => setShowAddForm(false)} className="rounded bg-gray-200 text-gray-900 px-4 py-2 hover:bg-gray-300 cursor-pointer">
+                        <button
+                            type="button"
+                            onClick={() => setShowAddForm(false)}
+                            className="rounded bg-gray-200 text-gray-900 px-4 py-2 hover:bg-gray-300 cursor-pointer"
+                        >
                             Anuluj
                         </button>
-                        <button type="submit" className="rounded bg-black text-white px-4 py-2 hover:bg-gray-800 cursor-pointer">
+                        <button
+                            type="submit"
+                            className="rounded bg-black text-white px-4 py-2 hover:bg-gray-800 cursor-pointer"
+                        >
                             Zapisz
                         </button>
                     </div>
@@ -349,7 +289,7 @@ export default function StaffPage() {
                 >
                     <div className="md:col-span-3">
                         <h2 className="text-sm font-semibold text-slate-700">
-                            Edycja sprzętu: <span className="font-bold">{editForm.name}</span>
+                            Edycja sprzętu
                         </h2>
                     </div>
 
@@ -365,132 +305,119 @@ export default function StaffPage() {
 
                     <div>
                         <label className="block text-sm font-medium mb-1">Typ</label>
-                        <select
-                            value={editForm.type}
-                            onChange={(e) => setEditForm({ ...editForm, type: e.target.value as EquipmentType })}
-                            className="w-full rounded border px-3 py-2"
-                        >
-                            <option value="laptop">Laptop</option>
-                            <option value="camera">Kamera</option>
-                            <option value="projector">Projektor</option>
-                            <option value="microphone">Mikrofon</option>
-                            <option value="other">Inny</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Status</label>
-                        <select
-                            value={editForm.status}
-                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value as EquipmentStatus })}
-                            className="w-full rounded border px-3 py-2"
-                        >
-                            <option value="available">Dostępny</option>
-                            <option value="reserved">Zarezerwowany</option>
-                            <option value="borrowed">Wypożyczony</option>
-                            <option value="service">Serwis</option>
-                            <option value="broken">Uszkodzony</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Lokalizacja</label>
-                        <select
-                            value={editForm.location}
-                            onChange={(e) => setEditForm({ ...editForm, location: e.target.value as EquipmentLocation })}
-                            className="w-full rounded border px-3 py-2"
-                        >
-                            <option value="Lab1">Laboratorium 1</option>
-                            <option value="Lab2">Laboratorium 2</option>
-                            <option value="warehouse">Magazyn</option>
-                        </select>
-                    </div>
-
-                    <div className="md:col-span-1">
-                        <label className="block text-sm font-medium mb-1">Numer seryjny</label>
                         <input
-                            value={editForm.serial}
-                            onChange={(e) => setEditForm({ ...editForm, serial: e.target.value })}
+                            value={editForm.type}
+                            onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
                             className="w-full rounded border px-3 py-2"
                             required
                         />
                     </div>
 
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium mb-1">Specyfikacja</label>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Lokalizacja</label>
                         <input
-                            value={editForm.specs}
-                            onChange={(e) => setEditForm({ ...editForm, specs: e.target.value })}
+                            value={editForm.location}
+                            onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
                             className="w-full rounded border px-3 py-2"
+                            required
+                        />
+                    </div>
+
+                    <div className="md:col-span-1">
+                        <label className="block text-sm font-medium mb-1">Numer seryjny</label>
+                        <input
+                            value={editForm.serialNumber}
+                            onChange={(e) => setEditForm({ ...editForm, serialNumber: e.target.value })}
+                            className="w-full rounded border px-3 py-2"
+                            required
                         />
                     </div>
 
                     <div className="md:col-span-3 flex justify-end gap-2">
-                        <button type="button" onClick={cancelEdit} className="rounded bg-gray-200 text-gray-900 px-4 py-2 hover:bg-gray-300 cursor-pointer">
+                        <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="rounded bg-gray-200 text-gray-900 px-4 py-2 hover:bg-gray-300 cursor-pointer"
+                        >
                             Anuluj
                         </button>
-                        <button type="submit" className="rounded bg-black text-white px-4 py-2 hover:bg-gray-800 cursor-pointer">
+                        <button
+                            type="submit"
+                            className="rounded bg-black text-white px-4 py-2 hover:bg-gray-800 cursor-pointer"
+                        >
                             Zapisz zmiany
                         </button>
                     </div>
                 </form>
             )}
 
-            {/* Lista sprzętu */}
+            {/* Lista */}
             <div className="rounded-xl border bg-white overflow-x-auto">
-                <table className="min-w-full text-sm">
-                    <thead>
-                    <tr className="border-b bg-slate-50 text-left">
-                        <th className="px-4 py-3 font-semibold">Nazwa</th>
-                        <th className="px-4 py-3 font-semibold">Typ</th>
-                        <th className="px-4 py-3 font-semibold">Status</th>
-                        <th className="px-4 py-3 font-semibold">Lokalizacja</th>
-                        <th className="px-4 py-3 font-semibold">Nr seryjny</th>
-                        <th className="px-4 py-3 font-semibold">Specyfikacja</th>
-                        <th className="px-4 py-3 font-semibold text-right">Akcje</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {items.length === 0 ? (
-                        <tr>
-                            <td className="px-4 py-4 text-slate-600" colSpan={7}>
-                                Brak pozycji. Dodaj nowy sprzęt przyciskiem „Dodaj sprzęt”.
-                            </td>
+                {loading ? (
+                    <p className="p-4">Ładowanie…</p>
+                ) : error ? (
+                    <p className="p-4 text-red-600">{error}</p>
+                ) : (
+                    <table className="min-w-full text-sm">
+                        <thead>
+                        <tr className="border-b bg-slate-50 text-left">
+                            <th className="px-4 py-3 font-semibold">Nazwa</th>
+                            <th className="px-4 py-3 font-semibold">Typ</th>
+                            <th className="px-4 py-3 font-semibold">Status</th>
+                            <th className="px-4 py-3 font-semibold">Lokalizacja</th>
+                            <th className="px-4 py-3 font-semibold">Nr seryjny</th>
+                            <th className="px-4 py-3 font-semibold text-right">Akcje</th>
                         </tr>
-                    ) : (
-                        items.map((it) => (
-                            <tr key={it.id} className="border-b last:border-0">
-                                <td className="px-4 py-3">{it.name}</td>
-                                <td className="px-4 py-3">{labelType(it.type)}</td>
-                                <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 text-xs rounded ${statusPill(it.status)}`}>
-                                            {labelStatusUI(it.status)}
-                                        </span>
-                                </td>
-                                <td className="px-4 py-3">{labelLocation(it.location)}</td>
-                                <td className="px-4 py-3">{it.serial}</td>
-                                <td className="px-4 py-3">{it.specs}</td>
-                                <td className="px-4 py-3">
-                                    <div className="flex justify-end gap-2">
-                                        <button
-                                            onClick={() => startEdit(it)}
-                                            className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer"
-                                        >
-                                            Edytuj
-                                        </button>
-                                        <button
-                                            onClick={() => setItems((prev) => prev.filter((x) => x.id !== it.id))}
-                                            className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
-                                        >
-                                            Usuń
-                                        </button>
-                                    </div>
+                        </thead>
+                        <tbody>
+                        {items.length === 0 ? (
+                            <tr>
+                                <td className="px-4 py-4 text-slate-600" colSpan={6}>
+                                    Brak pozycji. Dodaj nowy sprzęt przyciskiem „Dodaj sprzęt”.
                                 </td>
                             </tr>
-                        ))
-                    )}
-                    </tbody>
-                </table>
+                        ) : (
+                            items.map((it) => (
+                                <tr key={it.id} className="border-b last:border-0">
+                                    <td className="px-4 py-3">{it.name}</td>
+                                    <td className="px-4 py-3">{it.type}</td>
+                                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs rounded ${statusPill(it.status)}`}>
+                        {labelStatusUI(it.status)}
+                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">{it.location}</td>
+                                    <td className="px-4 py-3">{it.serialNumber}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setEditingId(it.id);
+                                                    setEditForm({
+                                                        name: it.name,
+                                                        type: it.type,
+                                                        serialNumber: it.serialNumber,
+                                                        location: it.location,
+                                                    });
+                                                }}
+                                                className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer"
+                                            >
+                                                Edytuj
+                                            </button>
+                                            <button
+                                                onClick={() => deleteDevice(it.id)}
+                                                className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
+                                            >
+                                                Usuń
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </section>
     );

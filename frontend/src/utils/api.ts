@@ -149,12 +149,45 @@ export const api = {
         }): Promise<Page<Device>> {
             return http<Page<Device>>(`/api/devices${toQuery(params)}`);
         },
+
         getById(id: number): Promise<Device> {
             return http<Device>(`/api/devices/${id}`);
         },
+
+        create(dto: {
+            name: string;
+            type: string;
+            serialNumber: string;
+            location: string;
+        }): Promise<Device> {
+            return http<Device>("/api/devices", {
+                method: "POST",
+                body: JSON.stringify(dto),
+            });
+        },
+
+        update(
+            id: number,
+            dto: {
+                name: string;
+                type: string;
+                serialNumber: string;
+                location: string;
+            }
+        ): Promise<Device> {
+            return http<Device>(`/api/devices/${id}`, {
+                method: "PUT",
+                body: JSON.stringify(dto),
+            });
+        },
+
+        delete(id: number): Promise<void> {
+            return http<void>(`/api/devices/${id}`, {
+                method: "DELETE",
+            });
+        },
     },
 
-    /* --- LOANS --- */
     /* --- LOANS --- */
     loans: {
         create(dto: {
