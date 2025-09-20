@@ -1,10 +1,9 @@
 // src/utils/reservationsStorage.ts
 
-export type ReservationStatus =
-    | "scheduled"
-    | "active"
-    | "completed"
-    | "cancelled";
+import { API, authHeader } from "./api";
+
+// ===== Typy po stronie FE =====
+export type ReservationStatus = "scheduled" | "active" | "completed" | "cancelled";
 
 export type Reservation = {
     id: string;
@@ -13,74 +12,108 @@ export type Reservation = {
     equipmentType?: string;
     serialNumber?: string;
     location?: string;
-    dateFrom: string; // ISO YYYY-MM-DD
-    dateTo: string;   // ISO YYYY-MM-DD
-    createdAt: string; // ISO
+    dateFrom: string;   // ISO / YYYY-MM-DD
+    dateTo: string;     // ISO / YYYY-MM-DD
+    createdAt: string;  // ISO (BE nie zwraca — ustawimy "teraz")
     status: ReservationStatus;
-    returnNotes?: string; // nowe pole – uwagi przy zwrocie
+    returnNotes?: string;
 };
 
-const KEY = "reservations";
-
-/* ===== internal helpers ===== */
-
-function load(): Reservation[] {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    try {
-        const parsed = JSON.parse(raw) as Reservation[];
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
+// ===== Mapowanie statusu BE (PL) -> FE =====
+// BE: "AKTYWNA" | "ANULOWANA" | "WYGASŁA" | "ZREALIZOWANA"
+function mapStatusFromBE(s: unknown): ReservationStatus {
+    const v = String(s ?? "").trim().toUpperCase();
+    if (["AKTYWNA", "ACTIVE"].includes(v)) return "active";
+    if (["ANULOWANA", "CANCELED", "CANCELLED"].includes(v)) return "cancelled";
+    if (["WYGASŁA", "EXPIRED", "ZREALIZOWANA", "FULFILLED", "COMPLETED"].includes(v)) return "completed";
+    return "scheduled";
 }
 
-function save(list: Reservation[]): void {
-    localStorage.setItem(KEY, JSON.stringify(list));
+// ===== Adapter BE -> FE =====
+// BE: { id, device{ id,name,type,serialNumber,location }, fromDate, toDate, status }
+function adaptReservation(be: any): Reservation {
+    const d: any = be?.device ?? {};
+    return {
+        id: String(be?.id),
+        equipmentId: Number(d?.id ?? 0),
+        equipmentName: String(d?.name ?? "Sprzęt"),
+        equipmentType: d?.type ?? undefined,
+        serialNumber: d?.serialNumber ?? undefined,
+        location: d?.location ?? undefined,
+        dateFrom: String(be?.fromDate ?? new Date().toISOString()),
+        dateTo: String(be?.toDate ?? new Date().toISOString()),
+        createdAt: new Date().toISOString(),
+        status: mapStatusFromBE(be?.status),
+        returnNotes: undefined,
+    };
 }
 
-/* ===== public API ===== */
+// ===== LISTA =====
+export async function getReservations(params: {
+    userId?: number;
+    deviceId?: number;
+    status?: string;
+    page?: number;
+    size?: number;
+} = {}): Promise<Reservation[]> {
+    const url = new URL(API("/api/reservations"));
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
+    });
 
-export function getReservations(): Reservation[] {
-    return load();
+    const res = await fetch(url.toString(), { headers: { ...authHeader() } });
+    if (!res.ok) throw new Error(`GET /api/reservations ${res.status}`);
+    const data = await res.json();
+
+    const content: any[] = Array.isArray(data)
+        ? data
+        : (Array.isArray((data as any)?.content) ? (data as any).content : []);
+    return content.map(adaptReservation);
 }
 
+// ===== CREATE =====
 export type NewReservationInput = {
     equipmentId: number;
-    equipmentName: string;
-    equipmentType?: string;
-    serialNumber?: string;
-    location?: string;
-    dateFrom: string;
-    dateTo: string;
+    dateFrom: string; // "YYYY-MM-DD" lub ISO
+    dateTo: string;   // "YYYY-MM-DD" lub ISO
 };
 
-/** Dodaj rezerwację (status startowy: scheduled). */
-export function addReservation(input: NewReservationInput): Reservation {
-    const list = load();
-    const newRes: Reservation = {
-        ...input,
-        id: Math.random().toString(36).slice(2),
-        createdAt: new Date().toISOString(),
-        status: "scheduled",
+export async function addReservation(input: NewReservationInput): Promise<Reservation> {
+    const payload = {
+        deviceId: input.equipmentId,
+        fromDate: input.dateFrom,
+        toDate: input.dateTo,
     };
-    list.push(newRes);
-    save(list);
-    return newRes;
+
+    const res = await fetch(API("/api/reservations"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`POST /api/reservations ${res.status}: ${t}`);
+    }
+    const be = await res.json();
+    return adaptReservation(be);
 }
 
-/** Oznacz rezerwację jako anulowaną. */
-export function cancelReservation(id: string): void {
-    const list: Reservation[] = load().map((r) =>
-        r.id === id ? { ...r, status: "cancelled" as const } : r
-    );
-    save(list);
+// ===== CANCEL =====
+export async function cancelReservation(id: string): Promise<Reservation> {
+    const res = await fetch(API(`/api/reservations/${id}/cancel`), {
+        method: "POST",
+        headers: { ...authHeader() },
+    });
+    if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`POST /api/reservations/${id}/cancel ${res.status}: ${t}`);
+    }
+    const be = await res.json();
+    return adaptReservation(be);
 }
 
-/** Oznacz rezerwację jako zakończoną (zwrot). Można dodać uwagi. */
-export function completeReservation(id: string, notes?: string): void {
-    const list: Reservation[] = load().map((r) =>
-        r.id === id ? { ...r, status: "completed" as const, returnNotes: notes } : r
-    );
-    save(list);
+// ===== COMPLETE (zwrot) =====
+// Brak endpointu w BE — rzuć czytelnym błędem, aby UI mógł pokazać info.
+export async function completeReservation(_id: string, _notes?: string): Promise<never> {
+    throw new Error("Zwrot rezerwacji nie jest obsługiwany w backendzie. Użyj zwrotu wypożyczenia (Loans).");
 }

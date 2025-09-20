@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     getReservations,
     cancelReservation,
-    completeReservation,
+    // completeReservation, // na razie NIE używamy
     type Reservation,
     type ReservationStatus,
 } from "../utils/reservationsStorage";
@@ -31,11 +31,8 @@ function statusPillClasses(s: ReservationStatus) {
 
 // Format daty YYYY-MM-DD
 function fmt(dateISO: string) {
-    try {
-        return new Date(dateISO).toISOString().slice(0, 10);
-    } catch {
-        return dateISO;
-    }
+    try { return new Date(dateISO).toISOString().slice(0, 10); }
+    catch { return dateISO; }
 }
 
 // Status wyliczany z dat
@@ -53,22 +50,38 @@ export default function MyReservationsPage() {
     const [filter, setFilter] = useState<FilterStatus>("all");
     const [results, setResults] = useState<Reservation[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [error, setError] = useState("");
 
     // Modal zwrotu
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [returningReservation, setReturningReservation] = useState<Reservation | null>(null);
     const [returnNotes, setReturnNotes] = useState("");
 
-    useEffect(() => {
-        refresh();
-    }, []);
+    // blokada przycisków podczas requestu
+    const [busyId, setBusyId] = useState<string | null>(null);
+
+    useEffect(() => { refresh(); }, []);
+
+    // ✅ Odświeżenie – pełne przeładowanie listy z API
+    const refresh = async () => {
+        try {
+            setError("");
+            setLoaded(false);
+            // Nie przekazujemy {page,size}, żeby zgadzało się z Twoim obecnym typem getReservations()
+            const list = await getReservations();
+            setResults(list);
+        } catch (e: any) {
+            setError(e?.message || "Błąd pobierania rezerwacji");
+        } finally {
+            setLoaded(true);
+        }
+    };
 
     // Posortowane po dacie OD
-    const sorted = useMemo(() => {
-        return [...results].sort(
-            (a, b) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime()
-        );
-    }, [results]);
+    const sorted = useMemo(
+        () => [...results].sort((a, b) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime()),
+        [results]
+    );
 
     // Filtrowanie
     const visible = useMemo(() => {
@@ -77,18 +90,18 @@ export default function MyReservationsPage() {
         return sorted.filter((r) => deriveStatus(r) === filter);
     }, [filter, loaded, sorted]);
 
-    // ✅ Odświeżenie – pełne przeładowanie listy
-    const refresh = () => {
-        const list = getReservations();
-        setResults(list);
-        setLoaded(true);
-    };
-
     const handleClear = () => setFilter("all");
 
-    const handleCancel = (id: string) => {
-        cancelReservation(id);
-        refresh();
+    const handleCancel = async (id: string) => {
+        try {
+            setBusyId(id);
+            await cancelReservation(id);
+            await refresh();
+        } catch (e: any) {
+            setError(e?.message || "Nie udało się anulować rezerwacji");
+        } finally {
+            setBusyId(null);
+        }
     };
 
     const handleReturn = (res: Reservation) => {
@@ -97,14 +110,10 @@ export default function MyReservationsPage() {
         setShowReturnModal(true);
     };
 
-    const confirmReturn = () => {
-        if (!returningReservation) return;
-        completeReservation(returningReservation.id);
-        console.log("Uwagi do zwrotu:", returnNotes);
+    const confirmReturn = async () => {
+        // Na razie tylko informujemy – endpoint „complete” nie jest dostępny
         setShowReturnModal(false);
-        setReturningReservation(null);
-        setReturnNotes("");
-        refresh();
+        setError("Zwrot rezerwacji nie jest dostępny. Zrealizuj zwrot w module wypożyczeń (Loans).");
     };
 
     // ===== Eksport CSV =====
@@ -130,12 +139,7 @@ export default function MyReservationsPage() {
             "location","dateFrom","dateTo","status","createdAt",
         ];
 
-        const escape = (val: unknown) => {
-            const s = String(val ?? "");
-            const escaped = s.replace(/"/g, '""');
-            return `"${escaped}"`;
-        };
-
+        const escape = (val: unknown) => `"${String(val ?? "").replace(/"/g, '""')}"`;
         const csv = header.join(",") + "\n" +
             rows.map((row) => header.map((h) => escape((row as any)[h])).join(",")).join("\n");
 
@@ -150,9 +154,10 @@ export default function MyReservationsPage() {
 
     // ===== Eksport PDF =====
     const exportPdf = async () => {
-        const [{ default: jsPDF }, autoTableModule] = await Promise.all([
-            import("jspdf"),
-            import("jspdf-autotable"),
+        // TS w Vite często nie zna typów dynamicznych importów — rzutujemy na any
+        const [{ default: jsPDF }, autoTableModule] = await Promise.all<any>([
+            import("jspdf") as any,
+            import("jspdf-autotable") as any,
         ]);
         const autoTable = (autoTableModule as any).default || (autoTableModule as any);
         const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
@@ -212,35 +217,22 @@ export default function MyReservationsPage() {
                 </div>
 
                 <div className="ml-auto flex gap-2">
-                    {/* Eksport PDF i CSV – niebieskie */}
-                    <button
-                        onClick={exportPdf}
-                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                    >
+                    <button onClick={exportPdf} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
                         Eksport PDF
                     </button>
-                    <button
-                        onClick={exportCsv}
-                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                    >
+                    <button onClick={exportCsv} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
                         Eksport CSV
                     </button>
-
-                    {/* Odśwież i Wyczyść filtr – szare */}
-                    <button
-                        onClick={refresh}
-                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
-                    >
+                    <button onClick={refresh} className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700">
                         Odśwież
                     </button>
-                    <button
-                        onClick={handleClear}
-                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
-                    >
+                    <button onClick={() => setFilter("all")} className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700">
                         Wyczyść filtr
                     </button>
                 </div>
             </div>
+
+            {error && <p className="text-red-600">{error}</p>}
 
             {/* Lista wyników */}
             <div className="rounded-xl border bg-white p-3">
@@ -253,7 +245,7 @@ export default function MyReservationsPage() {
                         {visible.map((r) => {
                             const dStatus = deriveStatus(r);
                             const canCancel = dStatus === "scheduled";
-                            const canReturn = dStatus === "active";
+                            const canReturn = dStatus === "active"; // BE nie ma „complete” – pokaż modal/informację
 
                             return (
                                 <li key={r.id} className="border rounded-lg p-4">
@@ -271,18 +263,19 @@ export default function MyReservationsPage() {
                                             )}
                                         </div>
                                         <span className={`text-xs px-2 py-1 rounded ${statusPillClasses(dStatus)}`}>
-                                            {statusLabel(dStatus)}
-                                        </span>
+                      {statusLabel(dStatus)}
+                    </span>
                                     </div>
 
                                     {(canCancel || canReturn) && (
                                         <div className="mt-3 flex gap-2">
                                             {canCancel && (
                                                 <button
+                                                    disabled={busyId === r.id}
                                                     onClick={() => handleCancel(r.id)}
-                                                    className="text-sm px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700"
+                                                    className="text-sm px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
                                                 >
-                                                    Anuluj
+                                                    {busyId === r.id ? "Anuluję…" : "Anuluj"}
                                                 </button>
                                             )}
                                             {canReturn && (
@@ -322,7 +315,7 @@ export default function MyReservationsPage() {
                                 onClick={() => setShowReturnModal(false)}
                                 className="rounded bg-slate-600 text-white px-4 py-2 hover:bg-slate-700"
                             >
-                                Anuluj
+                                Zamknij
                             </button>
                             <button
                                 onClick={confirmReturn}
@@ -331,6 +324,9 @@ export default function MyReservationsPage() {
                                 Potwierdź zwrot
                             </button>
                         </div>
+                        <p className="mt-3 text-xs text-slate-500">
+                            * Zwrot rezerwacji nie jest obsługiwany w backendzie. Użyj zwrotu wypożyczenia (Loans).
+                        </p>
                     </div>
                 </div>
             )}

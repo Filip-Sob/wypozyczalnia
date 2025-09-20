@@ -9,6 +9,8 @@ import pl.sobczak.wypozyczalnia.dto.UserRegisterDto;
 import pl.sobczak.wypozyczalnia.dto.UserMeDto;
 import pl.sobczak.wypozyczalnia.model.User;
 import pl.sobczak.wypozyczalnia.repository.UserRepository;
+// src/main/java/pl/sobczak/wypozyczalnia/controller/UserController.java
+// ... (importy jak w Twojej wersji)
 
 @RestController
 @RequestMapping("/api/users")
@@ -38,10 +40,18 @@ public class UserController {
         return userRepo.save(u);
     }
 
-    // ⬇️ NOWE: kim jestem (wymaga Basic Auth)
     @GetMapping("/me")
     public UserMeDto me(Authentication auth) {
-        String username = auth.getName(); // nazwa z Basic Auth
+        String username = auth.getName();
+        User u = userRepo.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Nie znaleziono użytkownika: " + username));
+        return new UserMeDto(u.getId(), u.getUsername(), u.getEmail(), u.getRole());
+    }
+
+    // ⬇️ NOWE: LOGOWANIE (Basic Auth w nagłówku). Zwraca to samo co /me.
+    @PostMapping("/login")
+    public UserMeDto login(Authentication auth) {
+        String username = auth.getName();
         User u = userRepo.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Nie znaleziono użytkownika: " + username));
         return new UserMeDto(u.getId(), u.getUsername(), u.getEmail(), u.getRole());
