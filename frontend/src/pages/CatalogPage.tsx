@@ -1,111 +1,106 @@
 // src/pages/CatalogPage.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/ui/Button";
 import { addReservation } from "../utils/reservationsStorage";
-import { Laptop, Video, Projector } from "lucide-react"; // ikonki
+import { api, type Device } from "../utils/api";
+import { Laptop, Video, Projector } from "lucide-react";
 
-type Equipment = {
-    id: number;
-    name: string;
-    type: "Laptop" | "Kamera" | "Projektor";
-    specification: string;
-    serialNumber: string;
-    location: string;
-    status: "Dostępny" | "Wypożyczony" | "Zarezerwowany";
-};
-
-const MOCK_DATA: Equipment[] = [
-    {
-        id: 1,
-        name: "Laptop Dell",
-        type: "Laptop",
-        specification: "Intel i5, 8GB RAM, 256GB SSD",
-        serialNumber: "LAP-12345",
-        location: "Laboratorium 1",
-        status: "Dostępny",
-    },
-    {
-        id: 2,
-        name: "Kamera Sony",
-        type: "Kamera",
-        specification: "Full HD, 60fps, zoom x10",
-        serialNumber: "CAM-98765",
-        location: "Laboratorium 2",
-        status: "Wypożyczony",
-    },
-    {
-        id: 3,
-        name: "Projektor Epson",
-        type: "Projektor",
-        specification: "3000 lm, 1080p",
-        serialNumber: "PRJ-55555",
-        location: "Magazyn",
-        status: "Zarezerwowany",
-    },
-];
-
-// === Mapowanie statusu na wygląd pigułki ===
-function statusPillClasses(status: Equipment["status"]) {
-    switch (status) {
-        case "Dostępny":
-            return "bg-emerald-100 text-emerald-700";
-        case "Wypożyczony":
-            return "bg-indigo-100 text-indigo-700";
-        case "Zarezerwowany":
-            return "bg-amber-100 text-amber-700";
+/** Mapowanie statusów BE -> label PL */
+function statusLabelPL(status?: string) {
+    switch ((status || "").toUpperCase()) {
+        case "AVAILABLE": return "Dostępny";
+        case "RESERVED":  return "Zarezerwowany";
+        case "LOANED":    return "Wypożyczony";
+        case "SERVICE":   return "Serwis";
+        case "DAMAGED":   return "Uszkodzony";
+        default:          return status || "—";
     }
 }
 
-// === Mapowanie typów na ikonki ===
-function equipmentIcon(type: Equipment["type"]) {
-    switch (type) {
-        case "Laptop":
-            return <Laptop className="w-6 h-6 text-slate-600" />;
-        case "Kamera":
-            return <Video className="w-6 h-6 text-slate-600" />;
-        case "Projektor":
-            return <Projector className="w-6 h-6 text-slate-600" />;
-        default:
-            return null;
+/** Pigułki statusu (po PL labelu) */
+function statusPillClassesPL(label: string) {
+    switch (label) {
+        case "Dostępny":      return "bg-emerald-100 text-emerald-700";
+        case "Zarezerwowany": return "bg-amber-100 text-amber-700";
+        case "Wypożyczony":   return "bg-indigo-100 text-indigo-700";
+        case "Serwis":        return "bg-slate-100 text-slate-700";
+        case "Uszkodzony":    return "bg-rose-100 text-rose-700";
+        default:              return "bg-slate-100 text-slate-700";
     }
+}
+
+/** Mapowanie wyboru z selecta (PL) -> status BE (EN) do filtra */
+function filterPLtoApiStatus(val: string): string | undefined {
+    switch (val) {
+        case "Dostępny":      return "AVAILABLE";
+        case "Zarezerwowany": return "RESERVED";
+        case "Wypożyczony":   return "LOANED";
+        case "Serwis":        return "SERVICE";
+        case "Uszkodzony":    return "DAMAGED";
+        case "Dowolny":
+        default:
+            return undefined;
+    }
+}
+
+/** Ikony według typu (opcjonalnie) */
+function equipmentIcon(type?: string) {
+    const t = (type || "").toLowerCase();
+    if (t.includes("laptop")) return <Laptop className="w-6 h-6 text-slate-600" />;
+    if (t.includes("kamer"))  return <Video className="w-6 h-6 text-slate-600" />;
+    if (t.includes("projekt"))return <Projector className="w-6 h-6 text-slate-600" />;
+    return null;
 }
 
 export default function CatalogPage() {
-    const [search, setSearch] = useState("");
-    const [type, setType] = useState("Wszystkie");
-    const [status, setStatus] = useState("Dowolny");
+    // filtry
+    const [search, setSearch]   = useState("");
+    const [type, setType]       = useState("Wszystkie");
+    const [status, setStatus]   = useState("Dowolny");
     const [location, setLocation] = useState("Dowolna");
 
-    const [results, setResults] = useState<Equipment[]>([]);
+    // dane
+    const [results, setResults] = useState<Device[]>([]);
     const [searched, setSearched] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState("");
 
     // modal rezerwacji
     const [showModal, setShowModal] = useState(false);
-    const [selected, setSelected] = useState<Equipment | null>(null);
+    const [selected, setSelected] = useState<Device | null>(null);
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
+    const [busyId, setBusyId] = useState<number | null>(null);
 
-    const handleSearch = () => {
-        let filtered = MOCK_DATA;
+    // wczytaj pierwszą stronę na start (opcjonalnie)
+    useEffect(() => {
+        handleSearch();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-        if (search) {
-            filtered = filtered.filter((item) =>
-                item.name.toLowerCase().includes(search.toLowerCase())
-            );
+    const handleSearch = async () => {
+        try {
+            setErr("");
+            setLoading(true);
+            const page = await api.devices.search({
+                q: search || undefined,
+                type: type !== "Wszystkie" ? type : undefined,
+                location: location !== "Dowolna" ? location : undefined,
+                status: filterPLtoApiStatus(status),
+                page: 0,
+                size: 24,
+                sort: "name,asc",
+            });
+            setResults(page.content);
+            setSearched(true);
+        } catch (e: any) {
+            setErr(e?.message || "Błąd pobierania urządzeń");
+            setResults([]);
+            setSearched(true);
+        } finally {
+            setLoading(false);
         }
-        if (type !== "Wszystkie") {
-            filtered = filtered.filter((item) => item.type === type);
-        }
-        if (status !== "Dowolny") {
-            filtered = filtered.filter((item) => item.status === status);
-        }
-        if (location !== "Dowolna") {
-            filtered = filtered.filter((item) => item.location === location);
-        }
-
-        setResults(filtered);
-        setSearched(true);
     };
 
     const handleReset = () => {
@@ -115,39 +110,41 @@ export default function CatalogPage() {
         setLocation("Dowolna");
         setResults([]);
         setSearched(false);
+        setErr("");
     };
 
-    const handleReserve = (eq: Equipment) => {
+    const handleReserve = (eq: Device) => {
         setSelected(eq);
         setDateFrom("");
         setDateTo("");
         setShowModal(true);
     };
 
-    const confirmReserve = () => {
+    const confirmReserve = async () => {
         if (!selected || !dateFrom || !dateTo) return;
-        const diffDays =
-            (new Date(dateTo).getTime() - new Date(dateFrom).getTime()) /
-            (1000 * 60 * 60 * 24);
 
+        const ms = new Date(dateTo).getTime() - new Date(dateFrom).getTime();
+        const diffDays = ms / (1000 * 60 * 60 * 24);
         if (diffDays > 14) {
             alert("⛔ Maksymalny okres rezerwacji to 14 dni.");
             return;
         }
 
-        addReservation({
-            equipmentId: selected.id,
-            equipmentName: selected.name,
-            equipmentType: selected.type,
-            serialNumber: selected.serialNumber,
-            location: selected.location,
-            dateFrom,
-            dateTo,
-        });
-
-        setShowModal(false);
-        setSelected(null);
-        alert("✅ Rezerwacja zapisana! Sprawdź w 'Moje rezerwacje'.");
+        try {
+            setBusyId(selected.id);
+            await addReservation({
+                equipmentId: selected.id,
+                dateFrom,
+                dateTo,
+            });
+            setShowModal(false);
+            setSelected(null);
+            alert("✅ Rezerwacja utworzona! Sprawdź w „Moje rezerwacje”.");
+        } catch (e: any) {
+            alert(e?.message || "Błąd tworzenia rezerwacji");
+        } finally {
+            setBusyId(null);
+        }
     };
 
     return (
@@ -158,8 +155,8 @@ export default function CatalogPage() {
 
             {/* Pasek wyszukiwania i filtrów */}
             <div className="rounded-xl border bg-white p-6 flex flex-col gap-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <div className="md:col-span-2">
                         <label className="block text-sm font-medium">Szukaj</label>
                         <input
                             type="text"
@@ -191,8 +188,10 @@ export default function CatalogPage() {
                         >
                             <option>Dowolny</option>
                             <option>Dostępny</option>
-                            <option>Wypożyczony</option>
                             <option>Zarezerwowany</option>
+                            <option>Wypożyczony</option>
+                            <option>Serwis</option>
+                            <option>Uszkodzony</option>
                         </select>
                     </div>
                     <div>
@@ -203,6 +202,7 @@ export default function CatalogPage() {
                             className="mt-2 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base px-3 py-2.5"
                         >
                             <option>Dowolna</option>
+                            {/* jeśli chcesz dynamicznie: pobierz distinct locations z BE */}
                             <option>Laboratorium 1</option>
                             <option>Laboratorium 2</option>
                             <option>Magazyn</option>
@@ -214,11 +214,13 @@ export default function CatalogPage() {
                     <Button variant="outline" className="px-5 py-2.5 text-base" onClick={handleReset}>
                         Wyczyść
                     </Button>
-                    <Button className="px-5 py-2.5 text-base" onClick={handleSearch}>
-                        Szukaj
+                    <Button className="px-5 py-2.5 text-base" onClick={handleSearch} disabled={loading}>
+                        {loading ? "Szukam…" : "Szukaj"}
                     </Button>
                 </div>
             </div>
+
+            {err && <p className="text-red-600">{err}</p>}
 
             {/* Lista sprzętu */}
             {searched && (
@@ -227,50 +229,51 @@ export default function CatalogPage() {
                         <p className="text-slate-600">Brak sprzętu dla wybranych kryteriów.</p>
                     ) : (
                         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {results.map((eq) => (
-                                <li key={eq.id} className="border rounded-lg p-4 flex flex-col justify-between">
-                                    <div>
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex gap-2">
-                                                {equipmentIcon(eq.type)}
-                                                <div>
-                                                    <h3 className="font-semibold">{eq.name}</h3>
-                                                    <p className="text-sm text-slate-600">{eq.type}</p>
-                                                    <p className="text-xs text-slate-500 mt-1">
-                                                        Specyfikacja: {eq.specification}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        Nr seryjny: {eq.serialNumber}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        Lokalizacja: {eq.location}
-                                                    </p>
+                            {results.map((eq) => {
+                                const label = statusLabelPL(eq.status);
+                                return (
+                                    <li key={eq.id} className="border rounded-lg p-4 flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex gap-2">
+                                                    {equipmentIcon(eq.type)}
+                                                    <div>
+                                                        <h3 className="font-semibold">{eq.name}</h3>
+                                                        <p className="text-sm text-slate-600">{eq.type}</p>
+                                                        <p className="text-xs text-slate-500 mt-1">
+                                                            Nr seryjny: {eq.serialNumber}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">
+                                                            Lokalizacja: {eq.location}
+                                                        </p>
+                                                    </div>
                                                 </div>
+                                                <span className={`text-xs px-2 py-1 rounded ${statusPillClassesPL(label)}`}>
+                          {label}
+                        </span>
                                             </div>
-                                            <span
-                                                className={`text-xs px-2 py-1 rounded ${statusPillClasses(eq.status)}`}
-                                            >
-                                                {eq.status}
-                                            </span>
                                         </div>
-                                    </div>
 
-                                    <div className="mt-3 flex gap-2">
-                                        {eq.status === "Dostępny" && (
-                                            <Button className="px-3 py-1 text-sm" onClick={() => handleReserve(eq)}>
-                                                Zarezerwuj
-                                            </Button>
-                                        )}
-                                        {/* Nowa opcja Historia */}
-                                        <Link
-                                            to={`/equipment/${eq.id}/history`}
-                                            className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 text-center"
-                                        >
-                                            Historia
-                                        </Link>
-                                    </div>
-                                </li>
-                            ))}
+                                        <div className="mt-3 flex gap-2">
+                                            {eq.status?.toUpperCase() === "AVAILABLE" && (
+                                                <Button
+                                                    className="px-3 py-1 text-sm"
+                                                    onClick={() => handleReserve(eq)}
+                                                    disabled={busyId === eq.id}
+                                                >
+                                                    {busyId === eq.id ? "Rezerwuję…" : "Zarezerwuj"}
+                                                </Button>
+                                            )}
+                                            <Link
+                                                to={`/equipment/${eq.id}/history`}
+                                                className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 text-center"
+                                            >
+                                                Historia
+                                            </Link>
+                                        </div>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>
@@ -315,6 +318,7 @@ export default function CatalogPage() {
                             <Button
                                 className="px-5 py-2.5 text-base"
                                 onClick={confirmReserve}
+                                disabled={busyId === selected.id}
                             >
                                 Potwierdź
                             </Button>

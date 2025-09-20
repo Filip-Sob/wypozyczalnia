@@ -155,6 +155,7 @@ export const api = {
     },
 
     /* --- LOANS --- */
+    /* --- LOANS --- */
     loans: {
         create(dto: {
             deviceId: number;
@@ -164,16 +165,24 @@ export const api = {
         }): Promise<Loan> {
             return http<Loan>("/api/loans", { method: "POST", body: JSON.stringify(dto) });
         },
+
         return(
             id: number,
             params?: { returnDate?: string; note?: string; damaged?: boolean }
         ): Promise<Loan> {
             return http<Loan>(`/api/loans/${id}/return${toQuery(params)}`, { method: "POST" });
         },
+
         list(params?: { page?: number; size?: number; sort?: string }) {
             return http<Page<Loan>>(`/api/loans${toQuery(params)}`);
         },
+
+        /** Historia wypożyczeń dla danego urządzenia */
+        historyByDevice(deviceId: number, params?: { page?: number; size?: number; sort?: string }) {
+            return http<Page<Loan>>(`/api/loans/device/${deviceId}${toQuery(params)}`);
+        },
     },
+
 
     /* --- RESERVATIONS (jeśli potrzebne) --- */
     reservations: {
