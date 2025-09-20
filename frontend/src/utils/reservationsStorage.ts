@@ -2,7 +2,7 @@
 
 import { API, authHeader } from "./api";
 
-// ===== Typy po stronie FE =====
+/* ===== Typy po stronie FE ===== */
 export type ReservationStatus = "scheduled" | "active" | "completed" | "cancelled";
 
 export type Reservation = {
@@ -19,8 +19,15 @@ export type Reservation = {
     returnNotes?: string;
 };
 
-// ===== Mapowanie statusu BE (PL) -> FE =====
-// BE: "AKTYWNA" | "ANULOWANA" | "WYGASŁA" | "ZREALIZOWANA"
+export type NewReservationInput = {
+    equipmentId: number;
+    dateFrom: string; // "YYYY-MM-DD" lub ISO
+    dateTo: string;   // "YYYY-MM-DD" lub ISO
+};
+
+/* ===== Mapowanie statusu BE (PL/EN) -> FE =====
+   BE: "AKTYWNA" | "ANULOWANA" | "WYGASŁA" | "ZREALIZOWANA"
+*/
 function mapStatusFromBE(s: unknown): ReservationStatus {
     const v = String(s ?? "").trim().toUpperCase();
     if (["AKTYWNA", "ACTIVE"].includes(v)) return "active";
@@ -29,8 +36,9 @@ function mapStatusFromBE(s: unknown): ReservationStatus {
     return "scheduled";
 }
 
-// ===== Adapter BE -> FE =====
-// BE: { id, device{ id,name,type,serialNumber,location }, fromDate, toDate, status }
+/* ===== Adapter BE -> FE =====
+   BE: { id, device{ id,name,type,serialNumber,location }, fromDate, toDate, status }
+*/
 function adaptReservation(be: any): Reservation {
     const d: any = be?.device ?? {};
     return {
@@ -48,15 +56,25 @@ function adaptReservation(be: any): Reservation {
     };
 }
 
-// ===== LISTA =====
+/* ===== Helpers ===== */
+async function getMe(): Promise<{ id: number; username: string; email: string; role: string }> {
+    const res = await fetch(API("/api/users/me"), { headers: { ...authHeader() } });
+    if (!res.ok) throw new Error(`GET /api/users/me ${res.status}`);
+    return res.json();
+}
+
+/* ===== LISTA MOICH REZERWACJI ===== */
 export async function getReservations(params: {
-    userId?: number;
     deviceId?: number;
     status?: string;
     page?: number;
     size?: number;
 } = {}): Promise<Reservation[]> {
+    // upewnij się, że filtrujemy po zalogowanym użytkowniku
+    const me = await getMe();
+
     const url = new URL(API("/api/reservations"));
+    url.searchParams.set("userId", String(me.id));
     Object.entries(params).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
     });
@@ -71,16 +89,14 @@ export async function getReservations(params: {
     return content.map(adaptReservation);
 }
 
-// ===== CREATE =====
-export type NewReservationInput = {
-    equipmentId: number;
-    dateFrom: string; // "YYYY-MM-DD" lub ISO
-    dateTo: string;   // "YYYY-MM-DD" lub ISO
-};
-
+/* ===== CREATE ===== */
 export async function addReservation(input: NewReservationInput): Promise<Reservation> {
+    // pobierz zalogowanego i dołóż userId — backend tego wymaga
+    const me = await getMe();
+
     const payload = {
         deviceId: input.equipmentId,
+        userId: me.id,
         fromDate: input.dateFrom,
         toDate: input.dateTo,
     };
@@ -98,7 +114,7 @@ export async function addReservation(input: NewReservationInput): Promise<Reserv
     return adaptReservation(be);
 }
 
-// ===== CANCEL =====
+/* ===== CANCEL ===== */
 export async function cancelReservation(id: string): Promise<Reservation> {
     const res = await fetch(API(`/api/reservations/${id}/cancel`), {
         method: "POST",
@@ -112,8 +128,9 @@ export async function cancelReservation(id: string): Promise<Reservation> {
     return adaptReservation(be);
 }
 
-// ===== COMPLETE (zwrot) =====
-// Brak endpointu w BE — rzuć czytelnym błędem, aby UI mógł pokazać info.
+/* ===== COMPLETE (zwrot) =====
+   Brak endpointu w BE — rzuć czytelnym błędem, aby UI mógł pokazać info.
+*/
 export async function completeReservation(_id: string, _notes?: string): Promise<never> {
     throw new Error("Zwrot rezerwacji nie jest obsługiwany w backendzie. Użyj zwrotu wypożyczenia (Loans).");
 }

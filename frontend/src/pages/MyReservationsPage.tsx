@@ -1,4 +1,6 @@
+// src/pages/MyReservationsPage.tsx
 import { useEffect, useMemo, useState } from "react";
+import { api } from "../utils/api";
 import {
     getReservations,
     cancelReservation,
@@ -12,27 +14,38 @@ type FilterStatus = "all" | ReservationStatus;
 // Etykiety dla statusów
 function statusLabel(s: ReservationStatus) {
     switch (s) {
-        case "scheduled": return "Zaplanowana";
-        case "active": return "Aktywna";
-        case "completed": return "Zakończona";
-        case "cancelled": return "Anulowana";
+        case "scheduled":
+            return "Zaplanowana";
+        case "active":
+            return "Aktywna";
+        case "completed":
+            return "Zakończona";
+        case "cancelled":
+            return "Anulowana";
     }
 }
 
 // Kolory „pigułek” statusu
 function statusPillClasses(s: ReservationStatus) {
     switch (s) {
-        case "scheduled": return "bg-indigo-100 text-indigo-700";
-        case "active": return "bg-emerald-100 text-emerald-700";
-        case "completed": return "bg-slate-100 text-slate-700";
-        case "cancelled": return "bg-rose-100 text-rose-700";
+        case "scheduled":
+            return "bg-indigo-100 text-indigo-700";
+        case "active":
+            return "bg-emerald-100 text-emerald-700";
+        case "completed":
+            return "bg-slate-100 text-slate-700";
+        case "cancelled":
+            return "bg-rose-100 text-rose-700";
     }
 }
 
 // Format daty YYYY-MM-DD
 function fmt(dateISO: string) {
-    try { return new Date(dateISO).toISOString().slice(0, 10); }
-    catch { return dateISO; }
+    try {
+        return new Date(dateISO).toISOString().slice(0, 10);
+    } catch {
+        return dateISO;
+    }
 }
 
 // Status wyliczany z dat
@@ -60,15 +73,27 @@ export default function MyReservationsPage() {
     // blokada przycisków podczas requestu
     const [busyId, setBusyId] = useState<string | null>(null);
 
-    useEffect(() => { refresh(); }, []);
+    useEffect(() => {
+        void refresh();
+    }, []);
 
-    // ✅ Odświeżenie – pełne przeładowanie listy z API
+    // ✅ Odświeżenie – pełne przeładowanie listy z API (tylko dla zalogowanego)
     const refresh = async () => {
         try {
             setError("");
             setLoaded(false);
-            // Nie przekazujemy {page,size}, żeby zgadzało się z Twoim obecnym typem getReservations()
-            const list = await getReservations();
+
+            // pobierz zalogowanego użytkownika
+            const me = await api.auth.me();
+
+            // pobierz tylko jego rezerwacje
+            const list = await getReservations({
+                userId: me.id,
+                page: 0,
+                size: 200,
+                sort: "fromDate,desc",
+            });
+
             setResults(list);
         } catch (e: any) {
             setError(e?.message || "Błąd pobierania rezerwacji");
@@ -135,12 +160,22 @@ export default function MyReservationsPage() {
         });
 
         const header = [
-            "id","equipmentId","equipmentName","equipmentType","serialNumber",
-            "location","dateFrom","dateTo","status","createdAt",
+            "id",
+            "equipmentId",
+            "equipmentName",
+            "equipmentType",
+            "serialNumber",
+            "location",
+            "dateFrom",
+            "dateTo",
+            "status",
+            "createdAt",
         ];
 
         const escape = (val: unknown) => `"${String(val ?? "").replace(/"/g, '""')}"`;
-        const csv = header.join(",") + "\n" +
+        const csv =
+            header.join(",") +
+            "\n" +
             rows.map((row) => header.map((h) => escape((row as any)[h])).join(",")).join("\n");
 
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -171,13 +206,20 @@ export default function MyReservationsPage() {
 
         const head = [["#", "Equipment", "Type", "Serial no.", "Location", "From", "To", "Status"]];
         const body = visible.map((r, idx) => [
-            String(idx + 1), r.equipmentName, r.equipmentType ?? "",
-            r.serialNumber ?? "", r.location ?? "", fmt(r.dateFrom), fmt(r.dateTo),
+            String(idx + 1),
+            r.equipmentName,
+            r.equipmentType ?? "",
+            r.serialNumber ?? "",
+            r.location ?? "",
+            fmt(r.dateFrom),
+            fmt(r.dateTo),
             statusLabel(deriveStatus(r)),
         ]);
 
         autoTable(doc, {
-            head, body, startY: 80,
+            head,
+            body,
+            startY: 80,
             styles: { fontSize: 9, cellPadding: 6 },
             headStyles: { fillColor: [248, 250, 252], textColor: 15 },
             alternateRowStyles: { fillColor: [250, 250, 250] },
@@ -226,7 +268,10 @@ export default function MyReservationsPage() {
                     <button onClick={refresh} className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700">
                         Odśwież
                     </button>
-                    <button onClick={() => setFilter("all")} className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700">
+                    <button
+                        onClick={() => setFilter("all")}
+                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700"
+                    >
                         Wyczyść filtr
                     </button>
                 </div>

@@ -29,8 +29,7 @@ function statusPill(status: string) {
     if (["ZAREZERWOWANY", "RESERVED"].includes(v)) return "bg-amber-100 text-amber-700";
     if (["WYPOŻYCZONY", "LOANED"].includes(v)) return "bg-blue-100 text-blue-700";
     if (["SERWIS", "MAINTENANCE"].includes(v)) return "bg-purple-100 text-purple-700";
-    if (["USZKODZONY", "DAMAGED", "ZGUBIONY", "LOST"].includes(v))
-        return "bg-rose-100 text-rose-700";
+    if (["USZKODZONY", "DAMAGED", "ZGUBIONY", "LOST"].includes(v)) return "bg-rose-100 text-rose-700";
     return "bg-slate-100 text-slate-700";
 }
 
@@ -39,6 +38,10 @@ export default function StaffPage() {
     const [items, setItems] = useState<Device[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Auth / rola
+    const [authLoaded, setAuthLoaded] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Dodawanie
     const [showAddForm, setShowAddForm] = useState(false);
@@ -73,8 +76,27 @@ export default function StaffPage() {
         }
     };
 
+    useEffect(() => {
+        (async () => {
+            try {
+                const me = await api.auth.me();
+                const role = (me.role || "").toUpperCase().trim(); // ← elastyczne sprawdzanie
+                setIsAdmin(role.includes("ADMIN"));
+            } catch {
+                setIsAdmin(false);
+            } finally {
+                setAuthLoaded(true);
+            }
+        })();
+    }, []);
+
+    useEffect(() => {
+        loadDevices();
+    }, []);
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!isAdmin) return; // guard UI
         if (!form.name.trim() || !form.type.trim() || !form.serialNumber.trim() || !form.location.trim()) {
             alert("Wypełnij wszystkie pola: nazwa, typ, numer seryjny, lokalizacja.");
             return;
@@ -91,7 +113,7 @@ export default function StaffPage() {
 
     const saveEdit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingId) return;
+        if (!isAdmin || !editingId) return;
         if (!editForm.name.trim() || !editForm.type.trim() || !editForm.serialNumber.trim() || !editForm.location.trim()) {
             alert("Wypełnij wszystkie pola: nazwa, typ, numer seryjny, lokalizacja.");
             return;
@@ -106,6 +128,7 @@ export default function StaffPage() {
     };
 
     const deleteDevice = async (id: number) => {
+        if (!isAdmin) return;
         if (!window.confirm("Czy na pewno usunąć urządzenie?")) return;
         try {
             await api.devices.delete(id);
@@ -114,10 +137,6 @@ export default function StaffPage() {
             alert("Błąd przy usuwaniu: " + (e?.message || "Nieznany"));
         }
     };
-
-    useEffect(() => {
-        loadDevices();
-    }, []);
 
     /* ===== Eksport CSV ===== */
     const exportCsv = () => {
@@ -186,10 +205,21 @@ export default function StaffPage() {
         doc.save("equipment-list.pdf");
     };
 
+    if (!authLoaded) {
+        return <section className="p-6 text-slate-600">Ładowanie…</section>;
+    }
+
     return (
         <section className="space-y-6">
             <header className="flex items-center justify-between">
-                <h1 className="text-xl font-bold">Panel opiekuna</h1>
+                <div>
+                    <h1 className="text-xl font-bold">Panel opiekuna</h1>
+                    {!isAdmin && (
+                        <p className="text-xs text-slate-500 mt-1">
+                            Tryb tylko do odczytu — uprawnienia wymagają roli ADMIN.
+                        </p>
+                    )}
+                </div>
                 <div className="flex gap-2">
                     <button
                         onClick={exportPdf}
@@ -203,17 +233,19 @@ export default function StaffPage() {
                     >
                         Eksport CSV
                     </button>
-                    <button
-                        onClick={() => setShowAddForm((s) => !s)}
-                        className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
-                    >
-                        {showAddForm ? "Ukryj formularz" : "Dodaj sprzęt"}
-                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={() => setShowAddForm((s) => !s)}
+                            className="px-4 py-2 rounded bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
+                        >
+                            {showAddForm ? "Ukryj formularz" : "Dodaj sprzęt"}
+                        </button>
+                    )}
                 </div>
             </header>
 
-            {/* Formularz dodawania */}
-            {showAddForm && (
+            {/* Formularz dodawania — tylko ADMIN */}
+            {isAdmin && showAddForm && (
                 <form
                     onSubmit={handleAdd}
                     className="rounded-xl border bg-white p-4 grid grid-cols-1 md:grid-cols-3 gap-3"
@@ -280,17 +312,15 @@ export default function StaffPage() {
                 </form>
             )}
 
-            {/* Formularz edycji */}
-            {editingId !== null && (
+            {/* Formularz edycji — tylko ADMIN */}
+            {isAdmin && editingId !== null && (
                 <form
                     id="edit-form"
                     onSubmit={saveEdit}
                     className="rounded-xl border bg-white p-4 grid grid-cols-1 md:grid-cols-3 gap-3"
                 >
                     <div className="md:col-span-3">
-                        <h2 className="text-sm font-semibold text-slate-700">
-                            Edycja sprzętu
-                        </h2>
+                        <h2 className="text-sm font-semibold text-slate-700">Edycja sprzętu</h2>
                     </div>
 
                     <div className="md:col-span-1">
@@ -373,7 +403,9 @@ export default function StaffPage() {
                         {items.length === 0 ? (
                             <tr>
                                 <td className="px-4 py-4 text-slate-600" colSpan={6}>
-                                    Brak pozycji. Dodaj nowy sprzęt przyciskiem „Dodaj sprzęt”.
+                                    {isAdmin
+                                        ? "Brak pozycji. Dodaj nowy sprzęt przyciskiem „Dodaj sprzęt”."
+                                        : "Brak pozycji. Poproś administratora o dodanie sprzętu."}
                                 </td>
                             </tr>
                         ) : (
@@ -390,26 +422,32 @@ export default function StaffPage() {
                                     <td className="px-4 py-3">{it.serialNumber}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex justify-end gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingId(it.id);
-                                                    setEditForm({
-                                                        name: it.name,
-                                                        type: it.type,
-                                                        serialNumber: it.serialNumber,
-                                                        location: it.location,
-                                                    });
-                                                }}
-                                                className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer"
-                                            >
-                                                Edytuj
-                                            </button>
-                                            <button
-                                                onClick={() => deleteDevice(it.id)}
-                                                className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
-                                            >
-                                                Usuń
-                                            </button>
+                                            {isAdmin ? (
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingId(it.id);
+                                                            setEditForm({
+                                                                name: it.name,
+                                                                type: it.type,
+                                                                serialNumber: it.serialNumber,
+                                                                location: it.location,
+                                                            });
+                                                        }}
+                                                        className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer"
+                                                    >
+                                                        Edytuj
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteDevice(it.id)}
+                                                        className="px-3 py-1 rounded bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
+                                                    >
+                                                        Usuń
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 select-none">Brak uprawnień</span>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
